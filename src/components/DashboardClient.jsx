@@ -71,17 +71,23 @@ function ConfirmModal({ message, onConfirm, onCancel, danger = false }) {
   )
 }
 
-function BroadcastModal({ target, groupName, onSend, onClose, isPending }) {
+function BroadcastModal({ target, groupName, selectedCount, onSend, onClose, isPending }) {
   const [body, setBody] = useState('')
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40">
       <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full mx-4">
         <h3 className="text-sm font-semibold text-stone-800 mb-1">
-          {target === 'all' ? 'Broadcast to All Groups' : `Broadcast to "${groupName}"`}
+          {target === 'all'
+            ? 'Broadcast to All Groups'
+            : target === 'selected'
+            ? `Broadcast to ${selectedCount} selected member${selectedCount !== 1 ? 's' : ''}`
+            : `Broadcast to "${groupName}"`}
         </h3>
         <p className="text-xs text-stone-400 mb-4">
           {target === 'all'
             ? 'Sends a push notification to every subscribed user across all groups.'
+            : target === 'selected'
+            ? 'Sends a push notification to the selected members only.'
             : 'Sends a push notification to all subscribed members of this group.'}
         </p>
         <textarea
@@ -173,9 +179,13 @@ export default function DashboardClient({ initialGroups }) {
   const [globalResults, setGlobalResults] = useState(null)
   const [loadingGlobal, setLoadingGlobal] = useState(false)
 
-  const [broadcastTarget, setBroadcastTarget] = useState(null) // null | 'all' | groupId string
+  const [broadcastTarget, setBroadcastTarget] = useState(null) // null | 'all' | 'selected' | groupId string
   const [broadcastGroupName, setBroadcastGroupName] = useState('')
   const [showMenu, setShowMenu] = useState(false)
+  const [selectedMemberIds, setSelectedMemberIds] = useState(new Set())
+  const [showGroupMenu, setShowGroupMenu] = useState(false)
+  const [editingGroupHeader, setEditingGroupHeader] = useState(false)
+  const [groupNameDraft, setGroupNameDraft] = useState('')
 
   const [search, setSearch] = useState('')
   const [confirm, setConfirm] = useState(null)
@@ -203,6 +213,9 @@ export default function DashboardClient({ initialGroups }) {
     setSearch('')
     setGroupDetails(null)
     setLoadingMembers(true)
+    setSelectedMemberIds(new Set())
+    setShowGroupMenu(false)
+    setEditingGroupHeader(false)
     const [membersResult, detailsResult] = await Promise.all([
       loadMembers(group.id),
       loadGroupDetails(group.id),
@@ -301,13 +314,40 @@ export default function DashboardClient({ initialGroups }) {
 
   async function handleBroadcast({ body }) {
     const isAll = broadcastTarget === 'all'
-    const groupId = isAll ? null : broadcastTarget
+    const isSelected = broadcastTarget === 'selected'
+    const groupId = (!isAll && !isSelected) ? broadcastTarget : null
+    const userIds = isSelected ? [...selectedMemberIds] : null
     startTransition(async () => {
-      const r = await broadcastPushAction({ groupId, body })
+      const r = await broadcastPushAction({ groupId, userIds, body })
       setBroadcastTarget(null)
+      if (isSelected) setSelectedMemberIds(new Set())
       if (r.error) { showToast(r.error, 'error'); return }
-      showToast(`Sent to ${r.sent} subscriber${r.sent !== 1 ? 's' : ''}`)
+      showToast(`Sent to ${r.sent} member${r.sent !== 1 ? 's' : ''}`)
     })
+  }
+
+  function toggleSelectMember(id) {
+    setSelectedMemberIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  async function submitGroupRename() {
+    const newName = groupNameDraft.trim()
+    if (!newName || newName === selectedGroup.name) { setEditingGroupHeader(false); return }
+    setRenaming(true)
+    const r = await renameGroupAction(selectedGroup.id, selectedGroup.name, newName)
+    if (r.error) { showToast(r.error, 'error') }
+    else {
+      setGroups(gs => gs.map(g => g.id === selectedGroup.id ? { ...g, name: newName } : g))
+      setSelectedGroup(s => ({ ...s, name: newName }))
+      showToast(`Renamed to "${newName}"`)
+    }
+    setEditingGroupHeader(false)
+    setRenaming(false)
   }
 
   // Stats
@@ -462,6 +502,7 @@ export default function DashboardClient({ initialGroups }) {
         <BroadcastModal
           target={broadcastTarget}
           groupName={broadcastGroupName}
+          selectedCount={selectedMemberIds.size}
           onSend={handleBroadcast}
           onClose={() => setBroadcastTarget(null)}
           isPending={isPending}
@@ -825,17 +866,29 @@ export default function DashboardClient({ initialGroups }) {
             <div className="max-w-6xl mx-auto">
               {/* Group header */}
               <div className="mb-4 space-y-2">
-                <div className="flex items-center justify-between flex-wrap gap-2">
-                  <div className="flex items-center gap-3 flex-wrap">
-                    <h2 className="text-base font-semibold text-stone-800">
-                      {selectedGroup.name}
-                      <span className="ml-2 text-sm font-normal text-stone-400">
-                        {members.length} member{members.length !== 1 ? 's' : ''}
-                      </span>
-                    </h2>
-                    {groupDetails?.invite_code && (
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    {editingGroupHeader ? (
+                      <input
+                        autoFocus
+                        value={groupNameDraft}
+                        onChange={e => setGroupNameDraft(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') submitGroupRename(); if (e.key === 'Escape') setEditingGroupHeader(false) }}
+                        onBlur={submitGroupRename}
+                        disabled={renaming}
+                        className="text-base font-semibold text-stone-800 border-b-2 border-jade outline-none bg-transparent"
+                      />
+                    ) : (
+                      <h2 className="text-base font-semibold text-stone-800 truncate">
+                        {selectedGroup.name}
+                        <span className="ml-2 text-sm font-normal text-stone-400">
+                          {members.length} member{members.length !== 1 ? 's' : ''}
+                        </span>
+                      </h2>
+                    )}
+                    {groupDetails?.invite_code && !editingGroupHeader && (
                       <span
-                        className="text-xs font-mono font-bold tracking-widest text-stone-500 bg-stone-100 px-2.5 py-1 rounded-lg cursor-pointer hover:bg-stone-200 transition-colors"
+                        className="shrink-0 text-xs font-mono font-bold tracking-widest text-stone-500 bg-stone-100 px-2.5 py-1 rounded-lg cursor-pointer hover:bg-stone-200 transition-colors"
                         title="Click to copy invite link"
                         onClick={() => {
                           navigator.clipboard.writeText(`https://app.coveyspace.com/login?code=${groupDetails.invite_code}`)
@@ -846,20 +899,49 @@ export default function DashboardClient({ initialGroups }) {
                       </span>
                     )}
                   </div>
-                  <div className="flex items-center gap-2 flex-wrap">
+
+                  {/* ⋯ group actions menu */}
+                  <div className="relative shrink-0">
                     <button
-                      onClick={() => { setBroadcastGroupName(selectedGroup.name); setBroadcastTarget(selectedGroup.id) }}
-                      className="px-3 py-1.5 text-xs font-medium rounded-xl bg-stone-100 text-stone-600 hover:bg-stone-200 transition-colors"
+                      onClick={() => setShowGroupMenu(v => !v)}
+                      className="p-2 rounded-xl text-stone-400 hover:text-stone-700 hover:bg-stone-100 transition-colors text-lg leading-none"
                     >
-                      📣 Broadcast
+                      ⋯
                     </button>
-                    <button
-                      onClick={() => exportCSV(selectedGroup.name, members)}
-                      disabled={members.length === 0}
-                      className="px-3 py-1.5 text-xs font-medium rounded-xl bg-stone-100 text-stone-600 hover:bg-stone-200 transition-colors disabled:opacity-40"
-                    >
-                      Export CSV
-                    </button>
+                    {showGroupMenu && (
+                      <>
+                        <div className="fixed inset-0 z-10" onClick={() => setShowGroupMenu(false)} />
+                        <div className="absolute right-0 top-full mt-1 z-20 w-48 bg-white rounded-xl shadow-xl border border-stone-100 py-1 overflow-hidden">
+                          <button
+                            onClick={() => { setShowGroupMenu(false); setGroupNameDraft(selectedGroup.name); setEditingGroupHeader(true) }}
+                            className="w-full text-left px-4 py-2.5 text-sm text-stone-700 hover:bg-stone-50 transition-colors"
+                          >
+                            Rename group
+                          </button>
+                          <button
+                            onClick={() => { setShowGroupMenu(false); setBroadcastGroupName(selectedGroup.name); setBroadcastTarget(selectedGroup.id) }}
+                            className="w-full text-left px-4 py-2.5 text-sm text-stone-700 hover:bg-stone-50 transition-colors"
+                          >
+                            📣 Broadcast to all
+                          </button>
+                          <button
+                            onClick={() => { setShowGroupMenu(false); exportCSV(selectedGroup.name, members) }}
+                            disabled={members.length === 0}
+                            className="w-full text-left px-4 py-2.5 text-sm text-stone-700 hover:bg-stone-50 transition-colors disabled:opacity-40"
+                          >
+                            Export CSV
+                          </button>
+                          <div className="border-t border-stone-100 mt-1 pt-1">
+                            <button
+                              onClick={() => { setShowGroupMenu(false); handleDeleteGroup(selectedGroup) }}
+                              className="w-full text-left px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 transition-colors"
+                            >
+                              Delete group
+                            </button>
+                          </div>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
                 {groupDetails?.settings && (
@@ -867,26 +949,70 @@ export default function DashboardClient({ initialGroups }) {
                 )}
               </div>
 
+              {/* Selection action bar */}
+              {selectedMemberIds.size > 0 && (
+                <div className="mb-3 flex items-center gap-3 px-4 py-2.5 bg-jade/5 border border-jade/20 rounded-xl">
+                  <span className="text-sm font-medium text-jade">
+                    {selectedMemberIds.size} selected
+                  </span>
+                  <button
+                    onClick={() => { setBroadcastGroupName(selectedGroup.name); setBroadcastTarget('selected') }}
+                    className="px-3 py-1 text-xs font-medium rounded-lg bg-jade text-white hover:opacity-90 transition-colors"
+                  >
+                    📣 Broadcast to selected
+                  </button>
+                  <button
+                    onClick={() => setSelectedMemberIds(new Set())}
+                    className="ml-auto text-xs text-stone-400 hover:text-stone-600 transition-colors"
+                  >
+                    Clear
+                  </button>
+                </div>
+              )}
+
               {displayedMembers.length === 0 ? (
                 <div className="bg-white rounded-2xl border border-stone-100 py-12 text-center text-stone-400">
                   <p className="text-sm">{search ? 'No matching members' : 'No members in this group'}</p>
                 </div>
               ) : (
                 <div className="bg-white rounded-2xl border border-stone-200 overflow-x-auto">
-                  <table className="w-full min-w-[860px] text-sm">
+                  <table className="w-full min-w-[900px] text-sm">
                     <thead>
                       <tr className="border-b border-stone-100 bg-stone-50">
+                        <th className="px-4 py-3 w-10">
+                          <input
+                            type="checkbox"
+                            checked={displayedMembers.length > 0 && displayedMembers.every(m => selectedMemberIds.has(m.id))}
+                            ref={el => { if (el) el.indeterminate = displayedMembers.some(m => selectedMemberIds.has(m.id)) && !displayedMembers.every(m => selectedMemberIds.has(m.id)) }}
+                            onChange={() => {
+                              const allSelected = displayedMembers.every(m => selectedMemberIds.has(m.id))
+                              setSelectedMemberIds(allSelected ? new Set() : new Set(displayedMembers.map(m => m.id)))
+                            }}
+                            className="rounded border-stone-300 text-jade focus:ring-jade/50 cursor-pointer"
+                          />
+                        </th>
                         <th className="text-left px-5 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">Name</th>
                         <th className="text-left px-5 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">Email</th>
                         <th className="text-left px-5 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">Role</th>
                         <th className="text-left px-5 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">Last Activity</th>
                         <th className="text-left px-5 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">Last Logged In</th>
-                        <th className="px-5 py-3 w-56"></th>
+                        <th className="px-5 py-3 w-44"></th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-stone-50">
                       {displayedMembers.map(member => (
-                        <tr key={member.id} className="hover:bg-stone-50 transition-colors group">
+                        <tr
+                          key={member.id}
+                          className={`hover:bg-stone-50 transition-colors group ${selectedMemberIds.has(member.id) ? 'bg-jade/5' : ''}`}
+                        >
+                          <td className="px-4 py-3">
+                            <input
+                              type="checkbox"
+                              checked={selectedMemberIds.has(member.id)}
+                              onChange={() => toggleSelectMember(member.id)}
+                              className="rounded border-stone-300 text-jade focus:ring-jade/50 cursor-pointer"
+                            />
+                          </td>
                           <td className="px-5 py-3">
                             {editingName?.id === member.id && editingName.type === 'user' ? (
                               <input

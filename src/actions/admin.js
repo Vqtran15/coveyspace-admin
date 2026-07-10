@@ -254,7 +254,7 @@ export async function deleteAllOrphanedUsersAction(orphanIds) {
   }
 }
 
-export async function broadcastPushAction({ groupId, body }) {
+export async function broadcastPushAction({ groupId, userIds, body }) {
   const title = 'Covey Space'
   await requireAuth()
   const ip = getIp()
@@ -265,7 +265,7 @@ export async function broadcastPushAction({ groupId, body }) {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
       },
-      body: JSON.stringify({ group_id: groupId ?? null, title, body, url: '/' }),
+      body: JSON.stringify({ group_id: groupId ?? null, user_ids: userIds ?? null, title, body, url: '/' }),
     })
     if (!res.ok) {
       const text = await res.text()
