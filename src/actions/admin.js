@@ -99,7 +99,8 @@ export async function deleteUserAction(userId, userName) {
     await sb.from('signups').delete().eq('user_id', userId)
     await sb.from('serving_signups').delete().eq('user_id', userId)
     await sb.from('prayer_reactions').delete().eq('user_id', userId)
-    await sb.auth.admin.deleteUser(userId)
+    const { error: delErr } = await sb.auth.admin.deleteUser(userId)
+    if (delErr) return { error: delErr.message }
     await logAudit({ action: 'delete_user', targetType: 'user', targetId: userId, targetLabel: userName, ip })
     return { success: true }
   } catch (e) {
@@ -241,7 +242,11 @@ export async function deleteAllOrphanedUsersAction(orphanIds) {
         sb.from('prayer_reactions').delete().eq('user_id', id),
       ])
     ))
-    await Promise.all(orphanIds.map(id => sb.auth.admin.deleteUser(id)))
+    const deleteResults = await Promise.all(orphanIds.map(id => sb.auth.admin.deleteUser(id)))
+    const failed = deleteResults.filter(r => r.error)
+    if (failed.length) {
+      return { error: `${failed.length} deletion(s) failed: ${failed[0].error.message}` }
+    }
     await logAudit({
       action: 'delete_all_orphans',
       targetType: 'user',

@@ -285,8 +285,13 @@ export default function DashboardClient({ initialGroups }) {
           const ids = orphanedUsers.map(o => o.id)
           const r = await deleteAllOrphanedUsersAction(ids)
           if (r.error) { showToast(r.error, 'error'); return }
-          setOrphanedUsers([])
           showToast(`Deleted ${r.count} orphaned account${r.count !== 1 ? 's' : ''}`)
+          // Refetch to confirm actual state rather than assuming deletion succeeded
+          setLoadingOrphans(true)
+          const { data, error } = await loadOrphanedUsers()
+          if (error) showToast(error, 'error')
+          else setOrphanedUsers(data || [])
+          setLoadingOrphans(false)
         })
       },
       true
@@ -529,6 +534,20 @@ export default function DashboardClient({ initialGroups }) {
                   <p className="text-xs text-stone-400 mt-0.5">Push notification to every group</p>
                 </div>
               </button>
+              <button
+                onClick={() => { setShowMenu(false); handleSelectOrphans() }}
+                className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-left hover:bg-stone-800 transition-colors"
+              >
+                <span>👻</span>
+                <div className="flex items-center gap-2">
+                  <p className="font-medium">Orphaned Users</p>
+                  {orphanedUsers !== null && orphanedUsers.length > 0 && (
+                    <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400">
+                      {orphanedUsers.length}
+                    </span>
+                  )}
+                </div>
+              </button>
               <Link
                 href="/audit"
                 onClick={() => setShowMenu(false)}
@@ -562,17 +581,29 @@ export default function DashboardClient({ initialGroups }) {
             {emptyGroups > 0 && ` · ${emptyGroups} empty`}
           </p>
         </div>
-        <button
-          onClick={() => setShowMenu(true)}
-          className="text-stone-400 hover:text-white transition-colors p-1.5 rounded-lg hover:bg-stone-800"
-          aria-label="Open menu"
-        >
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-            <rect y="3" width="20" height="2" rx="1"/>
-            <rect y="9" width="20" height="2" rx="1"/>
-            <rect y="15" width="20" height="2" rx="1"/>
-          </svg>
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={handleSelectGlobalSearch}
+            className={`p-1.5 rounded-lg transition-colors ${showGlobalSearch ? 'text-white bg-stone-700' : 'text-stone-400 hover:text-white hover:bg-stone-800'}`}
+            aria-label="Global search"
+          >
+            <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <circle cx="8.5" cy="8.5" r="5.5"/>
+              <line x1="13" y1="13" x2="18" y2="18"/>
+            </svg>
+          </button>
+          <button
+            onClick={() => setShowMenu(true)}
+            className="text-stone-400 hover:text-white transition-colors p-1.5 rounded-lg hover:bg-stone-800"
+            aria-label="Open menu"
+          >
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+              <rect y="3" width="20" height="2" rx="1"/>
+              <rect y="9" width="20" height="2" rx="1"/>
+              <rect y="15" width="20" height="2" rx="1"/>
+            </svg>
+          </button>
+        </div>
       </header>
 
       {/* Stats bar */}
@@ -652,46 +683,10 @@ export default function DashboardClient({ initialGroups }) {
                     {' · '}{formatDate(group.created_at)}
                   </p>
                 </div>
-                <div className="flex items-center gap-1 ml-2 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                  <button
-                    onClick={e => { e.stopPropagation(); startRename(group.id, group.name, 'group') }}
-                    className="px-2 py-0.5 rounded-md text-xs font-medium bg-stone-100 text-stone-600 hover:bg-stone-200 transition-colors"
-                  >Rename</button>
-                  <button
-                    onClick={e => { e.stopPropagation(); handleDeleteGroup(group) }}
-                    className="px-2 py-0.5 rounded-md text-xs font-medium bg-red-50 text-red-500 hover:bg-red-100 transition-colors"
-                  >Delete</button>
-                </div>
               </div>
             ))}
           </div>
 
-          {/* Sidebar bottom actions */}
-          <div className="border-t border-stone-100 p-3 space-y-1 shrink-0">
-            <button
-              onClick={handleSelectOrphans}
-              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm transition-colors ${
-                showOrphans ? 'bg-amber-50 text-amber-700' : 'text-stone-500 hover:bg-stone-50'
-              }`}
-            >
-              <span className="font-medium">Orphaned Users</span>
-              {orphanedUsers !== null && (
-                <span className={`text-xs font-semibold px-1.5 py-0.5 rounded-full ${
-                  orphanedUsers.length > 0 ? 'bg-amber-100 text-amber-600' : 'bg-stone-100 text-stone-400'
-                }`}>
-                  {orphanedUsers.length}
-                </span>
-              )}
-            </button>
-            <button
-              onClick={handleSelectGlobalSearch}
-              className={`w-full flex items-center px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
-                showGlobalSearch ? 'bg-stone-100 text-stone-800' : 'text-stone-500 hover:bg-stone-50'
-              }`}
-            >
-              Global Search
-            </button>
-          </div>
         </aside>
 
         {/* Main panel */}
