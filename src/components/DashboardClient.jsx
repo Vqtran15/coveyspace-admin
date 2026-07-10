@@ -48,10 +48,24 @@ function Badge({ role }) {
   )
 }
 
-function ConfirmModal({ message, onConfirm, onCancel, danger = false }) {
+function useAnimatedMount(open, duration) {
+  const [mounted, setMounted] = useState(open)
+  const [closing, setClosing] = useState(false)
+  useEffect(() => {
+    if (open) { setMounted(true); setClosing(false) }
+    else if (mounted) {
+      setClosing(true)
+      const t = setTimeout(() => { setMounted(false); setClosing(false) }, duration)
+      return () => clearTimeout(t)
+    }
+  }, [open])
+  return { mounted, closing }
+}
+
+function ConfirmModal({ closing, message, onConfirm, onCancel, danger = false }) {
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-sm w-full mx-4">
+    <div className={`fixed inset-0 z-40 flex items-center justify-center bg-black/40 ${closing ? 'anim-overlay-out' : 'anim-overlay-in'}`}>
+      <div className={`bg-white rounded-2xl shadow-2xl p-6 max-w-sm w-full mx-4 ${closing ? 'anim-card-out' : 'anim-card-in'}`}>
         <p className="text-sm text-stone-700 mb-5">{message}</p>
         <div className="flex gap-2 justify-end">
           <button onClick={onCancel} className="px-4 py-2 text-sm text-stone-600 hover:text-stone-800 transition-colors">
@@ -71,11 +85,11 @@ function ConfirmModal({ message, onConfirm, onCancel, danger = false }) {
   )
 }
 
-function BroadcastModal({ target, groupName, selectedCount, onSend, onClose, isPending }) {
+function BroadcastModal({ closing, target, groupName, selectedCount, onSend, onClose, isPending }) {
   const [body, setBody] = useState('')
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full mx-4">
+    <div className={`fixed inset-0 z-40 flex items-center justify-center bg-black/40 ${closing ? 'anim-overlay-out' : 'anim-overlay-in'}`}>
+      <div className={`bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full mx-4 ${closing ? 'anim-card-out' : 'anim-card-in'}`}>
         <h3 className="text-sm font-semibold text-stone-800 mb-1">
           {target === 'all'
             ? 'Broadcast to All Groups'
@@ -196,6 +210,11 @@ export default function DashboardClient({ initialGroups }) {
   const [renaming, setRenaming] = useState(false)
 
   const globalInputRef = useRef(null)
+
+  const confirmAnim     = useAnimatedMount(!!confirm, 150)
+  const broadcastAnim   = useAnimatedMount(!!broadcastTarget, 150)
+  const menuAnim        = useAnimatedMount(showMenu, 220)
+  const groupMenuAnim   = useAnimatedMount(showGroupMenu, 110)
 
   function showToast(msg, type = 'success') {
     setToast({ msg, type })
@@ -497,18 +516,20 @@ export default function DashboardClient({ initialGroups }) {
       )}
 
       {/* Confirm modal */}
-      {confirm && (
+      {confirmAnim.mounted && (
         <ConfirmModal
-          message={confirm.message}
-          danger={confirm.danger}
-          onConfirm={confirm.onConfirm}
+          closing={confirmAnim.closing}
+          message={confirm?.message}
+          danger={confirm?.danger}
+          onConfirm={confirm?.onConfirm}
           onCancel={() => setConfirm(null)}
         />
       )}
 
       {/* Broadcast modal */}
-      {broadcastTarget && (
+      {broadcastAnim.mounted && (
         <BroadcastModal
+          closing={broadcastAnim.closing}
           target={broadcastTarget}
           groupName={broadcastGroupName}
           selectedCount={selectedMemberIds.size}
@@ -519,10 +540,10 @@ export default function DashboardClient({ initialGroups }) {
       )}
 
       {/* Slideout menu */}
-      {showMenu && (
+      {menuAnim.mounted && (
         <div className="fixed inset-0 z-40 flex justify-end">
-          <div className="absolute inset-0 bg-black/30" onClick={() => setShowMenu(false)} />
-          <div className="relative w-64 bg-stone-900 text-white flex flex-col shadow-2xl animate-in slide-in-from-right duration-200">
+          <div className={`absolute inset-0 bg-black/30 ${menuAnim.closing ? 'anim-overlay-out' : 'anim-overlay-in'}`} onClick={() => setShowMenu(false)} />
+          <div className={`relative w-64 bg-stone-900 text-white flex flex-col shadow-2xl ${menuAnim.closing ? 'anim-slide-r-out' : 'anim-slide-r-in'}`}>
             <div className="flex items-center justify-between px-5 py-4 border-b border-stone-700">
               <p className="text-sm font-semibold">Menu</p>
               <button onClick={() => setShowMenu(false)} className="text-stone-400 hover:text-white transition-colors text-lg leading-none">✕</button>
@@ -907,10 +928,10 @@ export default function DashboardClient({ initialGroups }) {
                     >
                       ⋯
                     </button>
-                    {showGroupMenu && (
+                    {groupMenuAnim.mounted && (
                       <>
                         <div className="fixed inset-0 z-10" onClick={() => setShowGroupMenu(false)} />
-                        <div className="absolute right-0 top-full mt-1 z-20 w-48 bg-white rounded-xl shadow-xl border border-stone-100 py-1 overflow-hidden">
+                        <div className={`absolute right-0 top-full mt-1 z-20 w-48 bg-white rounded-xl shadow-xl border border-stone-100 py-1 overflow-hidden ${groupMenuAnim.closing ? 'anim-menu-out' : 'anim-menu-in'}`}>
                           <button
                             onClick={() => { setShowGroupMenu(false); setGroupNameDraft(selectedGroup.name); setEditingGroupHeader(true) }}
                             className="w-full text-left px-4 py-2.5 text-sm text-stone-700 hover:bg-stone-50 transition-colors"
