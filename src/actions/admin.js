@@ -255,6 +255,7 @@ export async function deleteAllOrphanedUsersAction(orphanIds) {
     ])
     const { error } = await sb.auth.admin.deleteUser(id)
     if (error) {
+      console.error(`deleteUser failed for ${id}:`, JSON.stringify(error))
       failedReasons.push(error.message)
     } else {
       succeeded.push(id)
