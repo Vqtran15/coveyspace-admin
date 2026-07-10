@@ -284,9 +284,12 @@ export default function DashboardClient({ initialGroups }) {
         startTransition(async () => {
           const ids = orphanedUsers.map(o => o.id)
           const r = await deleteAllOrphanedUsersAction(ids)
-          if (r.error) { showToast(r.error, 'error'); return }
-          showToast(`Deleted ${r.count} orphaned account${r.count !== 1 ? 's' : ''}`)
-          // Refetch to confirm actual state rather than assuming deletion succeeded
+          if (r.failedCount > 0) {
+            showToast(`${r.count} deleted, ${r.failedCount} failed: ${r.failedReason}`, 'error')
+          } else {
+            showToast(`Deleted ${r.count} orphaned account${r.count !== 1 ? 's' : ''}`)
+          }
+          // Refetch to confirm actual state
           setLoadingOrphans(true)
           const { data, error } = await loadOrphanedUsers()
           if (error) showToast(error, 'error')

@@ -231,31 +231,43 @@ export async function deleteAllOrphanedUsersAction(orphanIds) {
   await requireAuth()
   const ip = getIp()
   const sb = getSupabase()
-  try {
-    await Promise.all(orphanIds.map(id =>
-      Promise.all([
-        sb.from('reactions').delete().eq('user_id', id),
-        sb.from('messages').delete().eq('user_id', id),
-        sb.from('birthdays').delete().eq('user_id', id),
-        sb.from('signups').delete().eq('user_id', id),
-        sb.from('serving_signups').delete().eq('user_id', id),
-        sb.from('prayer_reactions').delete().eq('user_id', id),
-      ])
-    ))
-    const deleteResults = await Promise.all(orphanIds.map(id => sb.auth.admin.deleteUser(id)))
-    const failed = deleteResults.filter(r => r.error)
-    if (failed.length) {
-      return { error: `${failed.length} deletion(s) failed: ${failed[0].error.message}` }
+
+  const succeeded = []
+  const failedReasons = []
+
+  for (const id of orphanIds) {
+    // Clean up any data rows that may exist before removing the auth user
+    await Promise.all([
+      sb.from('conversation_members').delete().eq('user_id', id),
+      sb.from('reactions').delete().eq('user_id', id),
+      sb.from('messages').delete().eq('user_id', id),
+      sb.from('birthdays').delete().eq('user_id', id),
+      sb.from('signups').delete().eq('user_id', id),
+      sb.from('serving_signups').delete().eq('user_id', id),
+      sb.from('prayer_reactions').delete().eq('user_id', id),
+    ])
+    const { error } = await sb.auth.admin.deleteUser(id)
+    if (error) {
+      failedReasons.push(error.message)
+    } else {
+      succeeded.push(id)
     }
+  }
+
+  if (succeeded.length) {
     await logAudit({
       action: 'delete_all_orphans',
       targetType: 'user',
-      targetLabel: `Deleted ${orphanIds.length} orphaned account${orphanIds.length !== 1 ? 's' : ''}`,
+      targetLabel: `Deleted ${succeeded.length} orphaned account${succeeded.length !== 1 ? 's' : ''}${failedReasons.length ? `, ${failedReasons.length} failed` : ''}`,
       ip,
     })
-    return { success: true, count: orphanIds.length }
-  } catch (e) {
-    return { error: e.message }
+  }
+
+  return {
+    success: true,
+    count: succeeded.length,
+    failedCount: failedReasons.length,
+    failedReason: failedReasons[0] ?? null,
   }
 }
 
