@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition, useMemo, useRef } from 'react'
+import { useState, useEffect, useTransition, useMemo, useRef } from 'react'
 import Link from 'next/link'
 import {
   loadMembers,
