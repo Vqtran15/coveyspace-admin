@@ -274,9 +274,13 @@ export async function broadcastPushAction({ groupId, userIds, body }) {
     const result = await res.json()
     await logAudit({
       action: 'broadcast_push',
-      targetType: groupId ? 'group' : 'all',
+      targetType: userIds ? 'selected' : groupId ? 'group' : 'all',
       targetId: groupId ?? null,
-      targetLabel: groupId ? body.slice(0, 80) : `[All] ${body.slice(0, 80)}`,
+      targetLabel: userIds
+        ? `[${userIds.length} selected] ${body.slice(0, 60)}`
+        : groupId
+        ? body.slice(0, 80)
+        : `[All] ${body.slice(0, 80)}`,
       metadata: { sent: result.sent, stale: result.stale },
       ip,
     })
