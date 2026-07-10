@@ -4,6 +4,7 @@ import { useState, useTransition, useMemo } from 'react'
 import Link from 'next/link'
 import {
   loadMembers,
+  loadOrphanedUsers,
   deleteGroupAction,
   deleteUserAction,
   renameGroupAction,
@@ -65,6 +66,9 @@ export default function DashboardClient({ initialGroups }) {
   const [selectedGroup, setSelectedGroup] = useState(null)
   const [members, setMembers] = useState([])
   const [loadingMembers, setLoadingMembers] = useState(false)
+  const [orphanedUsers, setOrphanedUsers] = useState(null) // null = not yet loaded
+  const [loadingOrphans, setLoadingOrphans] = useState(false)
+  const [showOrphans, setShowOrphans] = useState(false)
   const [search, setSearch] = useState('')
   const [confirm, setConfirm] = useState(null) // { message, onConfirm, danger }
   const [toast, setToast] = useState(null)
@@ -80,12 +84,42 @@ export default function DashboardClient({ initialGroups }) {
   }
 
   async function selectGroup(group) {
+    setShowOrphans(false)
     setSelectedGroup(group)
     setSearch('')
     setLoadingMembers(true)
     const { data } = await loadMembers(group.id)
     setMembers(data || [])
     setLoadingMembers(false)
+  }
+
+  async function handleSelectOrphans() {
+    setSelectedGroup(null)
+    setMembers([])
+    setSearch('')
+    setShowOrphans(true)
+    if (orphanedUsers !== null) return
+    setLoadingOrphans(true)
+    const { data, error } = await loadOrphanedUsers()
+    if (error) showToast(error, 'error')
+    else setOrphanedUsers(data || [])
+    setLoadingOrphans(false)
+  }
+
+  async function handleDeleteOrphan(user) {
+    ask(
+      `Delete orphaned account "${user.email}"? This cannot be undone.`,
+      async () => {
+        setConfirm(null)
+        startTransition(async () => {
+          const r = await deleteUserAction(user.id, user.email)
+          if (r.error) { showToast(r.error, 'error'); return }
+          setOrphanedUsers(os => os.filter(o => o.id !== user.id))
+          showToast(`Deleted ${user.email}`)
+        })
+      },
+      true
+    )
   }
 
   function ask(message, onConfirm, danger = false) {
@@ -337,11 +371,85 @@ export default function DashboardClient({ initialGroups }) {
               </div>
             ))}
           </div>
+
+          {/* Orphaned users entry */}
+          <div className="border-t border-stone-100 p-3 shrink-0">
+            <button
+              onClick={handleSelectOrphans}
+              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm transition-colors ${
+                showOrphans ? 'bg-amber-50 text-amber-700' : 'text-stone-500 hover:bg-stone-50'
+              }`}
+            >
+              <span className="font-medium">Orphaned Users</span>
+              {orphanedUsers !== null && (
+                <span className={`text-xs font-semibold px-1.5 py-0.5 rounded-full ${
+                  orphanedUsers.length > 0 ? 'bg-amber-100 text-amber-600' : 'bg-stone-100 text-stone-400'
+                }`}>
+                  {orphanedUsers.length}
+                </span>
+              )}
+            </button>
+          </div>
         </aside>
 
-        {/* Main — members */}
+        {/* Main — members / orphans */}
         <main className="flex-1 overflow-auto p-6">
-          {!selectedGroup ? (
+          {showOrphans ? (
+            <div className="max-w-6xl mx-auto">
+              <div className="mb-4">
+                <h2 className="text-base font-semibold text-stone-800">
+                  Orphaned Users
+                  {orphanedUsers && (
+                    <span className="ml-2 text-sm font-normal text-stone-400">
+                      {orphanedUsers.length} account{orphanedUsers.length !== 1 ? 's' : ''}
+                    </span>
+                  )}
+                </h2>
+                <p className="text-xs text-stone-400 mt-1">Auth accounts with no group membership — signup failed, invite code was invalid, or they were removed without deleting the auth account.</p>
+              </div>
+              {loadingOrphans ? (
+                <div className="flex items-center justify-center py-16 text-stone-400">
+                  <p className="text-sm">Loading…</p>
+                </div>
+              ) : orphanedUsers?.length === 0 ? (
+                <div className="bg-white rounded-2xl border border-stone-100 py-12 text-center text-stone-400">
+                  <p className="text-sm">No orphaned accounts found</p>
+                </div>
+              ) : (
+                <div className="bg-white rounded-2xl border border-stone-200 overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-stone-100 bg-stone-50">
+                        <th className="text-left px-5 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">Email</th>
+                        <th className="text-left px-5 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">Signed Up</th>
+                        <th className="text-left px-5 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">Last Sign In</th>
+                        <th className="px-5 py-3 w-24"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-stone-50">
+                      {orphanedUsers.map(user => (
+                        <tr key={user.id} className="hover:bg-stone-50 transition-colors group">
+                          <td className="px-5 py-3 text-stone-700">{user.email}</td>
+                          <td className="px-5 py-3 text-xs text-stone-400 whitespace-nowrap">{formatTime(user.created_at)}</td>
+                          <td className="px-5 py-3 text-xs text-stone-400 whitespace-nowrap">{formatTime(user.last_sign_in_at)}</td>
+                          <td className="px-5 py-3">
+                            <div className="flex justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button
+                                onClick={() => handleDeleteOrphan(user)}
+                                className="px-2 py-0.5 rounded-md text-xs font-medium bg-red-50 text-red-500 hover:bg-red-100 transition-colors"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          ) : !selectedGroup ? (
             <div className="flex items-center justify-center h-full text-stone-400">
               <p className="text-sm">Select a group to view members</p>
             </div>

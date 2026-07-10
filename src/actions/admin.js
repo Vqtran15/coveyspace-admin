@@ -146,6 +146,22 @@ export async function resetPasswordAction(email, userName) {
   return { success: true }
 }
 
+export async function loadOrphanedUsers() {
+  await requireAuth()
+  const sb = getSupabase()
+  const [{ data: authData, error: aErr }, { data: profiles, error: pErr }] = await Promise.all([
+    sb.auth.admin.listUsers({ perPage: 1000 }),
+    sb.from('profiles').select('user_id'),
+  ])
+  if (aErr || pErr) return { error: (aErr || pErr).message }
+  const profileSet = new Set((profiles ?? []).map(p => p.user_id))
+  const orphans = (authData?.users ?? [])
+    .filter(u => !profileSet.has(u.id))
+    .map(u => ({ id: u.id, email: u.email, created_at: u.created_at, last_sign_in_at: u.last_sign_in_at }))
+    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+  return { data: orphans }
+}
+
 export async function loadAuditLog() {
   await requireAuth()
   const { data, error } = await getSupabase()
