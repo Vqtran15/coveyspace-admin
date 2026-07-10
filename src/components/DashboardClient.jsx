@@ -397,7 +397,8 @@ export default function DashboardClient({ initialGroups }) {
           if (r.error) { showToast(r.error, 'error'); return }
           setGroups(gs => gs.filter(g => g.id !== group.id))
           if (selectedGroup?.id === group.id) { setSelectedGroup(null); setMembers([]) }
-          showToast(`Deleted group "${group.name}"`)
+          if (r.warning) { showToast(r.warning, 'error') }
+          else { showToast(`Deleted group "${group.name}"`) }
         })
       },
       true

@@ -76,10 +76,17 @@ export async function deleteGroupAction(groupId, groupName) {
       sb.from('serving_pages').delete().eq('community_group_id', groupId),
       sb.from('profiles').delete().eq('community_group_id', groupId),
     ])
-    await Promise.all(userIds.map(id => sb.auth.admin.deleteUser(id)))
+    const failedUserReasons = []
+    for (const id of userIds) {
+      const { error: delErr } = await sb.auth.admin.deleteUser(id)
+      if (delErr) failedUserReasons.push(delErr.message)
+    }
     await sb.from('community_groups').delete().eq('id', groupId)
 
     await logAudit({ action: 'delete_group', targetType: 'group', targetId: groupId, targetLabel: groupName, ip })
+    if (failedUserReasons.length) {
+      return { success: true, warning: `Group deleted but ${failedUserReasons.length} user(s) failed to delete: ${failedUserReasons[0]}` }
+    }
     return { success: true }
   } catch (e) {
     return { error: e.message }
