@@ -69,7 +69,6 @@ function ConfirmModal({ message, onConfirm, onCancel, danger = false }) {
 }
 
 function BroadcastModal({ target, groupName, onSend, onClose, isPending }) {
-  const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40">
@@ -82,34 +81,21 @@ function BroadcastModal({ target, groupName, onSend, onClose, isPending }) {
             ? 'Sends a push notification to every subscribed user across all groups.'
             : 'Sends a push notification to all subscribed members of this group.'}
         </p>
-        <div className="space-y-3">
-          <div>
-            <label className="text-xs font-medium text-stone-500 block mb-1">Title</label>
-            <input
-              value={title}
-              onChange={e => setTitle(e.target.value)}
-              placeholder="Notification title"
-              className="w-full border border-stone-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-jade/50"
-            />
-          </div>
-          <div>
-            <label className="text-xs font-medium text-stone-500 block mb-1">Message</label>
-            <textarea
-              value={body}
-              onChange={e => setBody(e.target.value)}
-              placeholder="Notification body"
-              rows={3}
-              className="w-full border border-stone-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-jade/50 resize-none"
-            />
-          </div>
-        </div>
-        <div className="flex gap-2 justify-end mt-5">
+        <textarea
+          autoFocus
+          value={body}
+          onChange={e => setBody(e.target.value)}
+          placeholder="Message…"
+          rows={4}
+          className="w-full border border-stone-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-jade/50 resize-none"
+        />
+        <div className="flex gap-2 justify-end mt-4">
           <button onClick={onClose} className="px-4 py-2 text-sm text-stone-600 hover:text-stone-800 transition-colors">
             Cancel
           </button>
           <button
-            onClick={() => onSend({ title, body })}
-            disabled={!title.trim() || !body.trim() || isPending}
+            onClick={() => onSend({ body })}
+            disabled={!body.trim() || isPending}
             className="px-4 py-2 text-sm font-medium rounded-xl text-white bg-jade hover:opacity-90 transition-colors disabled:opacity-40"
           >
             {isPending ? 'Sending…' : 'Send Push'}
@@ -309,11 +295,11 @@ export default function DashboardClient({ initialGroups }) {
     )
   }
 
-  async function handleBroadcast({ title, body }) {
+  async function handleBroadcast({ body }) {
     const isAll = broadcastTarget === 'all'
     const groupId = isAll ? null : broadcastTarget
     startTransition(async () => {
-      const r = await broadcastPushAction({ groupId, title, body })
+      const r = await broadcastPushAction({ groupId, body })
       setBroadcastTarget(null)
       if (r.error) { showToast(r.error, 'error'); return }
       showToast(`Sent to ${r.sent} subscriber${r.sent !== 1 ? 's' : ''}`)

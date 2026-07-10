@@ -254,7 +254,8 @@ export async function deleteAllOrphanedUsersAction(orphanIds) {
   }
 }
 
-export async function broadcastPushAction({ groupId, title, body }) {
+export async function broadcastPushAction({ groupId, body }) {
+  const title = 'Covey Space'
   await requireAuth()
   const ip = getIp()
   try {
@@ -275,7 +276,7 @@ export async function broadcastPushAction({ groupId, title, body }) {
       action: 'broadcast_push',
       targetType: groupId ? 'group' : 'all',
       targetId: groupId ?? null,
-      targetLabel: groupId ? title : `[All] ${title}`,
+      targetLabel: groupId ? body.slice(0, 80) : `[All] ${body.slice(0, 80)}`,
       metadata: { sent: result.sent, stale: result.stale },
       ip,
     })
