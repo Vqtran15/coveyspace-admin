@@ -91,8 +91,14 @@ export async function deleteUserAction(userId, userName) {
   const ip = getIp()
   const sb = getSupabase()
   try {
+    // Delete data with no ON DELETE CASCADE before removing the auth user,
+    // otherwise the FK constraints on these tables will block the deletion.
     await sb.from('reactions').delete().eq('user_id', userId)
     await sb.from('messages').delete().eq('user_id', userId)
+    await sb.from('birthdays').delete().eq('user_id', userId)
+    await sb.from('signups').delete().eq('user_id', userId)
+    await sb.from('serving_signups').delete().eq('user_id', userId)
+    await sb.from('prayer_reactions').delete().eq('user_id', userId)
     await sb.auth.admin.deleteUser(userId)
     await logAudit({ action: 'delete_user', targetType: 'user', targetId: userId, targetLabel: userName, ip })
     return { success: true }
