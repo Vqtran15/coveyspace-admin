@@ -19,17 +19,20 @@ import {
 } from '@/actions/admin'
 import { logoutAction } from '@/actions/auth'
 
+const PT = 'America/Los_Angeles'
+
 function formatTime(iso) {
   if (!iso) return '—'
   return new Date(iso).toLocaleString('en-US', {
     month: 'short', day: 'numeric', year: 'numeric',
     hour: '2-digit', minute: '2-digit',
+    timeZone: PT,
   })
 }
 
 function formatDate(iso) {
   if (!iso) return '—'
-  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: PT })
 }
 
 function Badge({ role }) {
@@ -172,6 +175,7 @@ export default function DashboardClient({ initialGroups }) {
 
   const [broadcastTarget, setBroadcastTarget] = useState(null) // null | 'all' | groupId string
   const [broadcastGroupName, setBroadcastGroupName] = useState('')
+  const [showMenu, setShowMenu] = useState(false)
 
   const [search, setSearch] = useState('')
   const [confirm, setConfirm] = useState(null)
@@ -464,6 +468,50 @@ export default function DashboardClient({ initialGroups }) {
         />
       )}
 
+      {/* Slideout menu */}
+      {showMenu && (
+        <div className="fixed inset-0 z-40 flex justify-end">
+          <div className="absolute inset-0 bg-black/30" onClick={() => setShowMenu(false)} />
+          <div className="relative w-64 bg-stone-900 text-white flex flex-col shadow-2xl animate-in slide-in-from-right duration-200">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-stone-700">
+              <p className="text-sm font-semibold">Menu</p>
+              <button onClick={() => setShowMenu(false)} className="text-stone-400 hover:text-white transition-colors text-lg leading-none">✕</button>
+            </div>
+            <div className="flex flex-col p-4 gap-1">
+              <button
+                onClick={() => { setShowMenu(false); setBroadcastGroupName(''); setBroadcastTarget('all') }}
+                className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-left hover:bg-stone-800 transition-colors"
+              >
+                <span>📣</span>
+                <div>
+                  <p className="font-medium">Broadcast to All</p>
+                  <p className="text-xs text-stone-400 mt-0.5">Push notification to every group</p>
+                </div>
+              </button>
+              <Link
+                href="/audit"
+                onClick={() => setShowMenu(false)}
+                className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm hover:bg-stone-800 transition-colors"
+              >
+                <span>📋</span>
+                <div>
+                  <p className="font-medium">Audit Log</p>
+                  <p className="text-xs text-stone-400 mt-0.5">View recent admin actions</p>
+                </div>
+              </Link>
+            </div>
+            <div className="mt-auto p-4 border-t border-stone-700">
+              <button
+                onClick={() => logoutAction()}
+                className="w-full px-4 py-2.5 text-sm font-medium text-red-400 hover:bg-stone-800 rounded-xl transition-colors text-left"
+              >
+                Log out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <header className="bg-stone-900 text-white px-6 py-4 flex items-center justify-between shrink-0">
         <div>
@@ -473,23 +521,17 @@ export default function DashboardClient({ initialGroups }) {
             {emptyGroups > 0 && ` · ${emptyGroups} empty`}
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => { setBroadcastGroupName(''); setBroadcastTarget('all') }}
-            className="text-sm bg-stone-800 hover:bg-stone-700 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5"
-          >
-            <span>📣</span> Broadcast All
-          </button>
-          <Link href="/audit" className="text-sm text-stone-300 hover:text-white transition-colors">
-            Audit log
-          </Link>
-          <button
-            onClick={() => logoutAction()}
-            className="text-sm bg-stone-800 hover:bg-stone-700 px-3 py-1.5 rounded-lg transition-colors"
-          >
-            Log out
-          </button>
-        </div>
+        <button
+          onClick={() => setShowMenu(true)}
+          className="text-stone-400 hover:text-white transition-colors p-1.5 rounded-lg hover:bg-stone-800"
+          aria-label="Open menu"
+        >
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+            <rect y="3" width="20" height="2" rx="1"/>
+            <rect y="9" width="20" height="2" rx="1"/>
+            <rect y="15" width="20" height="2" rx="1"/>
+          </svg>
+        </button>
       </header>
 
       {/* Stats bar */}
