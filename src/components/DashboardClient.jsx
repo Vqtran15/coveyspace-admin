@@ -945,25 +945,52 @@ export default function DashboardClient({ initialGroups }) {
               </div>
 
               {/* Selection action bar */}
-              {selectedMemberIds.size > 0 && (
-                <div className="mb-3 flex items-center gap-3 px-4 py-2.5 bg-jade/5 border border-jade/20 rounded-xl">
-                  <span className="text-sm font-medium text-jade">
-                    {selectedMemberIds.size} selected
-                  </span>
-                  <button
-                    onClick={() => { setBroadcastGroupName(selectedGroup.name); setBroadcastTarget('selected') }}
-                    className="px-3 py-1 text-xs font-medium rounded-lg bg-jade text-white hover:opacity-90 transition-colors"
-                  >
-                    📣 Broadcast to selected
-                  </button>
-                  <button
-                    onClick={() => setSelectedMemberIds(new Set())}
-                    className="ml-auto text-xs text-stone-400 hover:text-stone-600 transition-colors"
-                  >
-                    Clear
-                  </button>
-                </div>
-              )}
+              {selectedMemberIds.size > 0 && (() => {
+                const single = selectedMemberIds.size === 1
+                  ? members.find(m => selectedMemberIds.has(m.id)) ?? null
+                  : null
+                return (
+                  <div className="mb-3 flex items-center gap-2 flex-wrap px-4 py-2.5 bg-jade/5 border border-jade/20 rounded-xl">
+                    <span className="text-sm font-medium text-jade mr-1">
+                      {selectedMemberIds.size} selected
+                    </span>
+                    <button
+                      onClick={() => { setBroadcastGroupName(selectedGroup.name); setBroadcastTarget('selected') }}
+                      className="px-3 py-1 text-xs font-medium rounded-lg bg-jade text-white hover:opacity-90 transition-colors"
+                    >
+                      📣 Broadcast
+                    </button>
+                    {single && (
+                      <>
+                        <button
+                          onClick={() => handleToggleRole(single)}
+                          className="px-3 py-1 text-xs font-medium rounded-lg bg-stone-100 text-stone-600 hover:bg-stone-200 transition-colors"
+                        >
+                          {single.role === 'admin' ? 'Demote' : 'Promote'}
+                        </button>
+                        <button
+                          onClick={() => handlePasswordReset(single)}
+                          className="px-3 py-1 text-xs font-medium rounded-lg bg-stone-100 text-stone-600 hover:bg-stone-200 transition-colors"
+                        >
+                          Reset password
+                        </button>
+                        <button
+                          onClick={() => handleDeleteUser(single)}
+                          className="px-3 py-1 text-xs font-medium rounded-lg bg-red-50 text-red-500 hover:bg-red-100 transition-colors"
+                        >
+                          Delete
+                        </button>
+                      </>
+                    )}
+                    <button
+                      onClick={() => setSelectedMemberIds(new Set())}
+                      className="ml-auto text-xs text-stone-400 hover:text-stone-600 transition-colors"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                )
+              })()}
 
               {displayedMembers.length === 0 ? (
                 <div className="bg-white rounded-2xl border border-stone-100 py-12 text-center text-stone-400">
@@ -991,7 +1018,6 @@ export default function DashboardClient({ initialGroups }) {
                         <th className="text-left px-5 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">Role</th>
                         <th className="text-left px-5 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">Last Activity</th>
                         <th className="text-left px-5 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">Last Logged In</th>
-                        <th className="px-5 py-3 w-44"></th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-stone-50">
@@ -1033,28 +1059,6 @@ export default function DashboardClient({ initialGroups }) {
                           <td className="px-5 py-3"><Badge role={member.role} /></td>
                           <td className="px-5 py-3 text-xs text-stone-400 whitespace-nowrap">{formatTime(member.last_active_at)}</td>
                           <td className="px-5 py-3 text-xs text-stone-400 whitespace-nowrap">{formatTime(member.last_sign_in_at)}</td>
-                          <td className="px-5 py-3 w-56">
-                            <div className="flex flex-nowrap items-center gap-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
-                              <button
-                                onClick={() => handleToggleRole(member)}
-                                className="px-2 py-0.5 rounded-md text-xs font-medium bg-jade/10 text-jade hover:bg-jade/20 transition-colors"
-                              >
-                                {member.role === 'admin' ? 'Demote' : 'Promote'}
-                              </button>
-                              <button
-                                onClick={() => handlePasswordReset(member)}
-                                className="px-2 py-0.5 rounded-md text-xs font-medium bg-stone-100 text-stone-600 hover:bg-stone-200 transition-colors"
-                              >
-                                Reset
-                              </button>
-                              <button
-                                onClick={() => handleDeleteUser(member)}
-                                className="px-2 py-0.5 rounded-md text-xs font-medium bg-red-50 text-red-500 hover:bg-red-100 transition-colors"
-                              >
-                                Delete
-                              </button>
-                            </div>
-                          </td>
                         </tr>
                       ))}
                     </tbody>
