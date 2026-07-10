@@ -252,6 +252,8 @@ export async function deleteAllOrphanedUsersAction(orphanIds) {
       sb.from('signups').delete().eq('user_id', id),
       sb.from('serving_signups').delete().eq('user_id', id),
       sb.from('prayer_reactions').delete().eq('user_id', id),
+      sb.from('meal_pages').delete().eq('user_id', id),
+      sb.from('serving_pages').delete().eq('user_id', id),
     ])
     const { error } = await sb.auth.admin.deleteUser(id)
     if (error) {
