@@ -146,6 +146,145 @@ export async function resetPasswordAction(email, userName) {
   return { success: true }
 }
 
+export async function loadGroupDetails(groupId) {
+  await requireAuth()
+  const sb = getSupabase()
+  const [{ data: group, error: gErr }, { data: settings }] = await Promise.all([
+    sb.from('community_groups').select('invite_code').eq('id', groupId).single(),
+    sb.from('group_settings')
+      .select('meals_enabled, services_enabled, chat_enabled, prayer_enabled, birthdays_enabled, guide_enabled')
+      .eq('group_id', groupId)
+      .maybeSingle(),
+  ])
+  if (gErr) return { error: gErr.message }
+  return {
+    data: {
+      invite_code: group?.invite_code ?? null,
+      settings: settings ?? null,
+    },
+  }
+}
+
+export async function searchUsersGlobalAction(query) {
+  await requireAuth()
+  const sb = getSupabase()
+  const q = query.trim().toLowerCase()
+  if (!q) return { data: [] }
+
+  const [{ data: authData, error: aErr }, { data: profiles, error: pErr }, { data: groups }] = await Promise.all([
+    sb.auth.admin.listUsers({ perPage: 1000 }),
+    sb.from('profiles').select('user_id, display_name, role, community_group_id, created_at'),
+    sb.from('community_groups').select('id, name'),
+  ])
+  if (aErr || pErr) return { error: (aErr || pErr).message }
+
+  const authMap = Object.fromEntries((authData?.users ?? []).map(u => [u.id, u]))
+  const groupMap = Object.fromEntries((groups ?? []).map(g => [g.id, g.name]))
+
+  const results = (profiles ?? [])
+    .filter(p => {
+      const email = authMap[p.user_id]?.email ?? ''
+      const name = p.display_name ?? ''
+      return email.toLowerCase().includes(q) || name.toLowerCase().includes(q)
+    })
+    .map(p => ({
+      id: p.user_id,
+      display_name: p.display_name,
+      role: p.role,
+      email: authMap[p.user_id]?.email ?? '',
+      group_id: p.community_group_id,
+      group_name: groupMap[p.community_group_id] ?? 'Unknown',
+      created_at: p.created_at,
+      last_sign_in_at: authMap[p.user_id]?.last_sign_in_at ?? null,
+    }))
+    .sort((a, b) => (a.group_name ?? '').localeCompare(b.group_name ?? ''))
+    .slice(0, 100)
+
+  return { data: results }
+}
+
+export async function deleteAllEmptyGroupsAction() {
+  await requireAuth()
+  const ip = getIp()
+  const sb = getSupabase()
+  try {
+    const { data: groups } = await sb
+      .from('community_groups')
+      .select('id, name, profiles(count)')
+    const empty = (groups ?? []).filter(g => (g.profiles?.[0]?.count ?? 0) === 0)
+    if (!empty.length) return { success: true, count: 0 }
+    await Promise.all(empty.map(g => sb.from('community_groups').delete().eq('id', g.id)))
+    await logAudit({
+      action: 'delete_empty_groups',
+      targetType: 'group',
+      targetLabel: `Deleted ${empty.length} empty group${empty.length !== 1 ? 's' : ''}`,
+      ip,
+    })
+    return { success: true, count: empty.length }
+  } catch (e) {
+    return { error: e.message }
+  }
+}
+
+export async function deleteAllOrphanedUsersAction(orphanIds) {
+  await requireAuth()
+  const ip = getIp()
+  const sb = getSupabase()
+  try {
+    await Promise.all(orphanIds.map(id =>
+      Promise.all([
+        sb.from('reactions').delete().eq('user_id', id),
+        sb.from('messages').delete().eq('user_id', id),
+        sb.from('birthdays').delete().eq('user_id', id),
+        sb.from('signups').delete().eq('user_id', id),
+        sb.from('serving_signups').delete().eq('user_id', id),
+        sb.from('prayer_reactions').delete().eq('user_id', id),
+      ])
+    ))
+    await Promise.all(orphanIds.map(id => sb.auth.admin.deleteUser(id)))
+    await logAudit({
+      action: 'delete_all_orphans',
+      targetType: 'user',
+      targetLabel: `Deleted ${orphanIds.length} orphaned account${orphanIds.length !== 1 ? 's' : ''}`,
+      ip,
+    })
+    return { success: true, count: orphanIds.length }
+  } catch (e) {
+    return { error: e.message }
+  }
+}
+
+export async function broadcastPushAction({ groupId, title, body }) {
+  await requireAuth()
+  const ip = getIp()
+  try {
+    const res = await fetch(`${process.env.SUPABASE_URL}/functions/v1/admin-broadcast-push`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
+      },
+      body: JSON.stringify({ group_id: groupId ?? null, title, body, url: '/' }),
+    })
+    if (!res.ok) {
+      const text = await res.text()
+      return { error: `Function error (${res.status}): ${text}` }
+    }
+    const result = await res.json()
+    await logAudit({
+      action: 'broadcast_push',
+      targetType: groupId ? 'group' : 'all',
+      targetId: groupId ?? null,
+      targetLabel: groupId ? title : `[All] ${title}`,
+      metadata: { sent: result.sent, stale: result.stale },
+      ip,
+    })
+    return { success: true, sent: result.sent ?? 0 }
+  } catch (e) {
+    return { error: e.message }
+  }
+}
+
 export async function loadOrphanedUsers() {
   await requireAuth()
   const sb = getSupabase()

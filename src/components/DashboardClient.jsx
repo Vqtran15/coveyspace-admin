@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useTransition, useMemo } from 'react'
+import { useState, useTransition, useMemo, useRef } from 'react'
 import Link from 'next/link'
 import {
   loadMembers,
+  loadGroupDetails,
   loadOrphanedUsers,
   deleteGroupAction,
   deleteUserAction,
@@ -11,6 +12,10 @@ import {
   editDisplayNameAction,
   toggleRoleAction,
   resetPasswordAction,
+  searchUsersGlobalAction,
+  deleteAllEmptyGroupsAction,
+  deleteAllOrphanedUsersAction,
+  broadcastPushAction,
 } from '@/actions/admin'
 import { logoutAction } from '@/actions/auth'
 
@@ -20,6 +25,11 @@ function formatTime(iso) {
     month: 'short', day: 'numeric', year: 'numeric',
     hour: '2-digit', minute: '2-digit',
   })
+}
+
+function formatDate(iso) {
+  if (!iso) return '—'
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
 function Badge({ role }) {
@@ -41,10 +51,7 @@ function ConfirmModal({ message, onConfirm, onCancel, danger = false }) {
       <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-sm w-full mx-4">
         <p className="text-sm text-stone-700 mb-5">{message}</p>
         <div className="flex gap-2 justify-end">
-          <button
-            onClick={onCancel}
-            className="px-4 py-2 text-sm text-stone-600 hover:text-stone-800 transition-colors"
-          >
+          <button onClick={onCancel} className="px-4 py-2 text-sm text-stone-600 hover:text-stone-800 transition-colors">
             Cancel
           </button>
           <button
@@ -61,35 +68,157 @@ function ConfirmModal({ message, onConfirm, onCancel, danger = false }) {
   )
 }
 
+function BroadcastModal({ target, groupName, onSend, onClose, isPending }) {
+  const [title, setTitle] = useState('')
+  const [body, setBody] = useState('')
+  return (
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40">
+      <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full mx-4">
+        <h3 className="text-sm font-semibold text-stone-800 mb-1">
+          {target === 'all' ? 'Broadcast to All Groups' : `Broadcast to "${groupName}"`}
+        </h3>
+        <p className="text-xs text-stone-400 mb-4">
+          {target === 'all'
+            ? 'Sends a push notification to every subscribed user across all groups.'
+            : 'Sends a push notification to all subscribed members of this group.'}
+        </p>
+        <div className="space-y-3">
+          <div>
+            <label className="text-xs font-medium text-stone-500 block mb-1">Title</label>
+            <input
+              value={title}
+              onChange={e => setTitle(e.target.value)}
+              placeholder="Notification title"
+              className="w-full border border-stone-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-jade/50"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-stone-500 block mb-1">Message</label>
+            <textarea
+              value={body}
+              onChange={e => setBody(e.target.value)}
+              placeholder="Notification body"
+              rows={3}
+              className="w-full border border-stone-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-jade/50 resize-none"
+            />
+          </div>
+        </div>
+        <div className="flex gap-2 justify-end mt-5">
+          <button onClick={onClose} className="px-4 py-2 text-sm text-stone-600 hover:text-stone-800 transition-colors">
+            Cancel
+          </button>
+          <button
+            onClick={() => onSend({ title, body })}
+            disabled={!title.trim() || !body.trim() || isPending}
+            className="px-4 py-2 text-sm font-medium rounded-xl text-white bg-jade hover:opacity-90 transition-colors disabled:opacity-40"
+          >
+            {isPending ? 'Sending…' : 'Send Push'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function FeatureFlags({ settings }) {
+  if (!settings) return null
+  const flags = [
+    ['Meals', settings.meals_enabled],
+    ['Services', settings.services_enabled],
+    ['Chat', settings.chat_enabled],
+    ['Prayer', settings.prayer_enabled],
+    ['Birthdays', settings.birthdays_enabled],
+    ['Guide', settings.guide_enabled],
+  ]
+  return (
+    <div className="flex gap-1.5 flex-wrap">
+      {flags.map(([label, enabled]) => (
+        <span
+          key={label}
+          className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+            enabled ? 'bg-jade/10 text-jade' : 'bg-stone-100 text-stone-400 line-through'
+          }`}
+        >
+          {label}
+        </span>
+      ))}
+    </div>
+  )
+}
+
+function exportCSV(groupName, members) {
+  const headers = ['Name', 'Email', 'Role', 'Last Activity', 'Last Logged In', 'Joined']
+  const rows = members.map(m => [
+    m.display_name ?? '',
+    m.email ?? '',
+    m.role ?? '',
+    m.last_active_at ? new Date(m.last_active_at).toLocaleString() : '',
+    m.last_sign_in_at ? new Date(m.last_sign_in_at).toLocaleString() : '',
+    m.created_at ? new Date(m.created_at).toLocaleString() : '',
+  ])
+  const csv = [headers, ...rows]
+    .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+    .join('\n')
+  const blob = new Blob([csv], { type: 'text/csv' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `${groupName.replace(/[^a-z0-9]/gi, '_')}_members.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 export default function DashboardClient({ initialGroups }) {
   const [groups, setGroups] = useState(initialGroups)
   const [selectedGroup, setSelectedGroup] = useState(null)
   const [members, setMembers] = useState([])
   const [loadingMembers, setLoadingMembers] = useState(false)
-  const [orphanedUsers, setOrphanedUsers] = useState(null) // null = not yet loaded
+  const [groupDetails, setGroupDetails] = useState(null)
+
+  const [orphanedUsers, setOrphanedUsers] = useState(null)
   const [loadingOrphans, setLoadingOrphans] = useState(false)
   const [showOrphans, setShowOrphans] = useState(false)
+
+  const [showGlobalSearch, setShowGlobalSearch] = useState(false)
+  const [globalQuery, setGlobalQuery] = useState('')
+  const [globalResults, setGlobalResults] = useState(null)
+  const [loadingGlobal, setLoadingGlobal] = useState(false)
+
+  const [broadcastTarget, setBroadcastTarget] = useState(null) // null | 'all' | groupId string
+  const [broadcastGroupName, setBroadcastGroupName] = useState('')
+
   const [search, setSearch] = useState('')
-  const [confirm, setConfirm] = useState(null) // { message, onConfirm, danger }
+  const [confirm, setConfirm] = useState(null)
   const [toast, setToast] = useState(null)
   const [isPending, startTransition] = useTransition()
 
-  // Inline editing state
-  const [editingName, setEditingName] = useState(null) // { id, value, type: 'group'|'user' }
+  const [editingName, setEditingName] = useState(null)
   const [renaming, setRenaming] = useState(false)
+
+  const globalInputRef = useRef(null)
 
   function showToast(msg, type = 'success') {
     setToast({ msg, type })
-    setTimeout(() => setToast(null), 3000)
+    setTimeout(() => setToast(null), 3500)
+  }
+
+  function ask(message, onConfirm, danger = false) {
+    setConfirm({ message, onConfirm, danger })
   }
 
   async function selectGroup(group) {
     setShowOrphans(false)
+    setShowGlobalSearch(false)
     setSelectedGroup(group)
     setSearch('')
+    setGroupDetails(null)
     setLoadingMembers(true)
-    const { data } = await loadMembers(group.id)
-    setMembers(data || [])
+    const [membersResult, detailsResult] = await Promise.all([
+      loadMembers(group.id),
+      loadGroupDetails(group.id),
+    ])
+    setMembers(membersResult.data || [])
+    setGroupDetails(detailsResult.data || null)
     setLoadingMembers(false)
   }
 
@@ -97,6 +226,7 @@ export default function DashboardClient({ initialGroups }) {
     setSelectedGroup(null)
     setMembers([])
     setSearch('')
+    setShowGlobalSearch(false)
     setShowOrphans(true)
     if (orphanedUsers !== null) return
     setLoadingOrphans(true)
@@ -104,6 +234,26 @@ export default function DashboardClient({ initialGroups }) {
     if (error) showToast(error, 'error')
     else setOrphanedUsers(data || [])
     setLoadingOrphans(false)
+  }
+
+  function handleSelectGlobalSearch() {
+    setSelectedGroup(null)
+    setMembers([])
+    setSearch('')
+    setShowOrphans(false)
+    setShowGlobalSearch(true)
+    setGlobalResults(null)
+    setGlobalQuery('')
+    setTimeout(() => globalInputRef.current?.focus(), 50)
+  }
+
+  async function handleGlobalSearch() {
+    if (!globalQuery.trim()) return
+    setLoadingGlobal(true)
+    const { data, error } = await searchUsersGlobalAction(globalQuery)
+    if (error) showToast(error, 'error')
+    else setGlobalResults(data || [])
+    setLoadingGlobal(false)
   }
 
   async function handleDeleteOrphan(user) {
@@ -122,8 +272,52 @@ export default function DashboardClient({ initialGroups }) {
     )
   }
 
-  function ask(message, onConfirm, danger = false) {
-    setConfirm({ message, onConfirm, danger })
+  async function handleDeleteAllOrphans() {
+    if (!orphanedUsers?.length) return
+    ask(
+      `Delete all ${orphanedUsers.length} orphaned accounts? This cannot be undone.`,
+      async () => {
+        setConfirm(null)
+        startTransition(async () => {
+          const ids = orphanedUsers.map(o => o.id)
+          const r = await deleteAllOrphanedUsersAction(ids)
+          if (r.error) { showToast(r.error, 'error'); return }
+          setOrphanedUsers([])
+          showToast(`Deleted ${r.count} orphaned account${r.count !== 1 ? 's' : ''}`)
+        })
+      },
+      true
+    )
+  }
+
+  async function handleDeleteAllEmpty() {
+    ask(
+      `Delete all ${emptyGroups} empty group${emptyGroups !== 1 ? 's' : ''}? This cannot be undone.`,
+      async () => {
+        setConfirm(null)
+        startTransition(async () => {
+          const r = await deleteAllEmptyGroupsAction()
+          if (r.error) { showToast(r.error, 'error'); return }
+          setGroups(gs => gs.filter(g => (g.member_count || 0) > 0))
+          if (selectedGroup && (selectedGroup.member_count || 0) === 0) {
+            setSelectedGroup(null); setMembers([])
+          }
+          showToast(`Deleted ${r.count} empty group${r.count !== 1 ? 's' : ''}`)
+        })
+      },
+      true
+    )
+  }
+
+  async function handleBroadcast({ title, body }) {
+    const isAll = broadcastTarget === 'all'
+    const groupId = isAll ? null : broadcastTarget
+    startTransition(async () => {
+      const r = await broadcastPushAction({ groupId, title, body })
+      setBroadcastTarget(null)
+      if (r.error) { showToast(r.error, 'error'); return }
+      showToast(`Sent to ${r.sent} subscriber${r.sent !== 1 ? 's' : ''}`)
+    })
   }
 
   // Stats
@@ -131,18 +325,19 @@ export default function DashboardClient({ initialGroups }) {
   const emptyGroups = groups.filter(g => (g.member_count || 0) === 0).length
   const adminCount = members.filter(m => m.role === 'admin').length
 
-  // Filtered groups
+  const groupLastActive = useMemo(() => {
+    return members.reduce((latest, m) => {
+      const t = m.last_active_at || m.last_sign_in_at
+      if (!t) return latest
+      return !latest || new Date(t) > new Date(latest) ? t : latest
+    }, null)
+  }, [members])
+
   const filteredGroups = useMemo(() => {
     if (!search) return groups
     const q = search.toLowerCase()
     return groups.filter(g => g.name?.toLowerCase().includes(q))
-  }, [groups, search, selectedGroup])
-
-  // Filtered members
-  const filteredMembers = useMemo(() => {
-    if (!search || selectedGroup) return members
-    return members
-  }, [members, search])
+  }, [groups, search])
 
   const displayedMembers = useMemo(() => {
     if (!search) return members
@@ -153,7 +348,7 @@ export default function DashboardClient({ initialGroups }) {
     )
   }, [members, search])
 
-  // --- Actions ---
+  // --- Group actions ---
   async function handleDeleteGroup(group) {
     ask(
       `Delete group "${group.name}" and all its members? This cannot be undone.`,
@@ -272,6 +467,17 @@ export default function DashboardClient({ initialGroups }) {
         />
       )}
 
+      {/* Broadcast modal */}
+      {broadcastTarget && (
+        <BroadcastModal
+          target={broadcastTarget}
+          groupName={broadcastGroupName}
+          onSend={handleBroadcast}
+          onClose={() => setBroadcastTarget(null)}
+          isPending={isPending}
+        />
+      )}
+
       {/* Header */}
       <header className="bg-stone-900 text-white px-6 py-4 flex items-center justify-between shrink-0">
         <div>
@@ -282,6 +488,12 @@ export default function DashboardClient({ initialGroups }) {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          <button
+            onClick={() => { setBroadcastGroupName(''); setBroadcastTarget('all') }}
+            className="text-sm bg-stone-800 hover:bg-stone-700 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5"
+          >
+            <span>📣</span> Broadcast All
+          </button>
           <Link href="/audit" className="text-sm text-stone-300 hover:text-white transition-colors">
             Audit log
           </Link>
@@ -295,11 +507,20 @@ export default function DashboardClient({ initialGroups }) {
       </header>
 
       {/* Stats bar */}
-      <div className="bg-white border-b border-stone-100 px-6 py-3 flex gap-6 text-sm shrink-0">
+      <div className="bg-white border-b border-stone-100 px-6 py-3 flex gap-6 text-sm items-center shrink-0 flex-wrap">
         <span className="text-stone-500">Groups: <strong className="text-stone-800">{groups.length}</strong></span>
         <span className="text-stone-500">Members: <strong className="text-stone-800">{totalMembers}</strong></span>
         {emptyGroups > 0 && (
-          <span className="text-amber-600">Empty groups: <strong>{emptyGroups}</strong></span>
+          <span className="text-amber-600 flex items-center gap-2">
+            Empty groups: <strong>{emptyGroups}</strong>
+            <button
+              onClick={handleDeleteAllEmpty}
+              disabled={isPending}
+              className="text-xs text-red-500 hover:text-red-600 underline underline-offset-2 transition-colors disabled:opacity-40"
+            >
+              Delete all
+            </button>
+          </span>
         )}
         {selectedGroup && (
           <>
@@ -308,19 +529,22 @@ export default function DashboardClient({ initialGroups }) {
               Viewing: <strong className="text-jade">{selectedGroup.name}</strong>
               {' · '}Admins: <strong className="text-stone-800">{adminCount}</strong>
             </span>
+            {groupLastActive && (
+              <span className="text-stone-400 text-xs">Last active: {formatTime(groupLastActive)}</span>
+            )}
           </>
         )}
       </div>
 
       <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar — groups */}
+        {/* Sidebar */}
         <aside className="w-72 bg-white border-r border-stone-100 flex flex-col shrink-0 overflow-hidden">
           <div className="p-3 border-b border-stone-100">
             <input
               type="text"
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="Search groups or members…"
+              placeholder="Filter groups…"
               className="w-full border border-stone-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-jade/50"
             />
           </div>
@@ -356,6 +580,7 @@ export default function DashboardClient({ initialGroups }) {
                   <p className="text-xs text-stone-400 mt-0.5">
                     {group.member_count || 0} member{group.member_count !== 1 ? 's' : ''}
                     {(group.member_count || 0) === 0 && ' · Empty'}
+                    {' · '}{formatDate(group.created_at)}
                   </p>
                 </div>
                 <div className="flex items-center gap-1 ml-2 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
@@ -372,8 +597,8 @@ export default function DashboardClient({ initialGroups }) {
             ))}
           </div>
 
-          {/* Orphaned users entry */}
-          <div className="border-t border-stone-100 p-3 shrink-0">
+          {/* Sidebar bottom actions */}
+          <div className="border-t border-stone-100 p-3 space-y-1 shrink-0">
             <button
               onClick={handleSelectOrphans}
               className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm transition-colors ${
@@ -389,23 +614,44 @@ export default function DashboardClient({ initialGroups }) {
                 </span>
               )}
             </button>
+            <button
+              onClick={handleSelectGlobalSearch}
+              className={`w-full flex items-center px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+                showGlobalSearch ? 'bg-stone-100 text-stone-800' : 'text-stone-500 hover:bg-stone-50'
+              }`}
+            >
+              Global Search
+            </button>
           </div>
         </aside>
 
-        {/* Main — members / orphans */}
+        {/* Main panel */}
         <main className="flex-1 overflow-auto p-6">
-          {showOrphans ? (
+
+          {/* — Orphaned users — */}
+          {showOrphans && (
             <div className="max-w-6xl mx-auto">
-              <div className="mb-4">
-                <h2 className="text-base font-semibold text-stone-800">
-                  Orphaned Users
-                  {orphanedUsers && (
-                    <span className="ml-2 text-sm font-normal text-stone-400">
-                      {orphanedUsers.length} account{orphanedUsers.length !== 1 ? 's' : ''}
-                    </span>
-                  )}
-                </h2>
-                <p className="text-xs text-stone-400 mt-1">Auth accounts with no group membership — signup failed, invite code was invalid, or they were removed without deleting the auth account.</p>
+              <div className="flex items-start justify-between mb-4">
+                <div>
+                  <h2 className="text-base font-semibold text-stone-800">
+                    Orphaned Users
+                    {orphanedUsers && (
+                      <span className="ml-2 text-sm font-normal text-stone-400">
+                        {orphanedUsers.length} account{orphanedUsers.length !== 1 ? 's' : ''}
+                      </span>
+                    )}
+                  </h2>
+                  <p className="text-xs text-stone-400 mt-1">Auth accounts with no group membership — signup failed, invite code was invalid, or they were removed without deleting the auth account.</p>
+                </div>
+                {orphanedUsers?.length > 0 && (
+                  <button
+                    onClick={handleDeleteAllOrphans}
+                    disabled={isPending}
+                    className="shrink-0 px-3 py-1.5 text-xs font-medium rounded-xl bg-red-50 text-red-500 hover:bg-red-100 transition-colors disabled:opacity-40"
+                  >
+                    Delete All ({orphanedUsers.length})
+                  </button>
+                )}
               </div>
               {loadingOrphans ? (
                 <div className="flex items-center justify-center py-16 text-stone-400">
@@ -449,23 +695,148 @@ export default function DashboardClient({ initialGroups }) {
                 </div>
               )}
             </div>
-          ) : !selectedGroup ? (
+          )}
+
+          {/* — Global search — */}
+          {showGlobalSearch && (
+            <div className="max-w-6xl mx-auto">
+              <div className="mb-4">
+                <h2 className="text-base font-semibold text-stone-800 mb-3">Global Search</h2>
+                <div className="flex gap-2">
+                  <input
+                    ref={globalInputRef}
+                    type="text"
+                    value={globalQuery}
+                    onChange={e => setGlobalQuery(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleGlobalSearch()}
+                    placeholder="Search by name or email across all groups…"
+                    className="flex-1 border border-stone-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-jade/50"
+                  />
+                  <button
+                    onClick={handleGlobalSearch}
+                    disabled={!globalQuery.trim() || loadingGlobal}
+                    className="px-4 py-2.5 text-sm font-medium rounded-xl bg-jade text-white hover:opacity-90 transition-colors disabled:opacity-40"
+                  >
+                    {loadingGlobal ? 'Searching…' : 'Search'}
+                  </button>
+                </div>
+              </div>
+
+              {globalResults === null && !loadingGlobal && (
+                <div className="bg-white rounded-2xl border border-stone-100 py-12 text-center text-stone-400">
+                  <p className="text-sm">Enter a name or email to search</p>
+                </div>
+              )}
+
+              {globalResults?.length === 0 && (
+                <div className="bg-white rounded-2xl border border-stone-100 py-12 text-center text-stone-400">
+                  <p className="text-sm">No matching users found</p>
+                </div>
+              )}
+
+              {globalResults?.length > 0 && (
+                <div className="bg-white rounded-2xl border border-stone-200 overflow-x-auto">
+                  <div className="px-5 py-3 border-b border-stone-100 bg-stone-50">
+                    <p className="text-xs text-stone-400">{globalResults.length} result{globalResults.length !== 1 ? 's' : ''}</p>
+                  </div>
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-stone-100">
+                        <th className="text-left px-5 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">Name</th>
+                        <th className="text-left px-5 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">Email</th>
+                        <th className="text-left px-5 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">Group</th>
+                        <th className="text-left px-5 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">Role</th>
+                        <th className="text-left px-5 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">Last Sign In</th>
+                        <th className="px-5 py-3 w-24"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-stone-50">
+                      {globalResults.map(user => (
+                        <tr key={user.id} className="hover:bg-stone-50 transition-colors">
+                          <td className="px-5 py-3 font-medium text-stone-800">{user.display_name || <span className="text-stone-400 italic">No name</span>}</td>
+                          <td className="px-5 py-3 text-stone-500">{user.email || '—'}</td>
+                          <td className="px-5 py-3 text-stone-600">{user.group_name}</td>
+                          <td className="px-5 py-3"><Badge role={user.role} /></td>
+                          <td className="px-5 py-3 text-xs text-stone-400 whitespace-nowrap">{formatTime(user.last_sign_in_at)}</td>
+                          <td className="px-5 py-3">
+                            <button
+                              onClick={() => {
+                                const group = groups.find(g => g.id === user.group_id)
+                                if (group) selectGroup(group)
+                              }}
+                              className="px-2 py-0.5 rounded-md text-xs font-medium bg-jade/10 text-jade hover:bg-jade/20 transition-colors whitespace-nowrap"
+                            >
+                              View Group
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* — No selection — */}
+          {!showOrphans && !showGlobalSearch && !selectedGroup && (
             <div className="flex items-center justify-center h-full text-stone-400">
               <p className="text-sm">Select a group to view members</p>
             </div>
-          ) : loadingMembers ? (
+          )}
+
+          {/* — Loading members — */}
+          {!showOrphans && !showGlobalSearch && selectedGroup && loadingMembers && (
             <div className="flex items-center justify-center h-full text-stone-400">
               <p className="text-sm">Loading…</p>
             </div>
-          ) : (
+          )}
+
+          {/* — Group member view — */}
+          {!showOrphans && !showGlobalSearch && selectedGroup && !loadingMembers && (
             <div className="max-w-6xl mx-auto">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-base font-semibold text-stone-800">
-                  {selectedGroup.name}
-                  <span className="ml-2 text-sm font-normal text-stone-400">
-                    {members.length} member{members.length !== 1 ? 's' : ''}
-                  </span>
-                </h2>
+              {/* Group header */}
+              <div className="mb-4 space-y-2">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <h2 className="text-base font-semibold text-stone-800">
+                      {selectedGroup.name}
+                      <span className="ml-2 text-sm font-normal text-stone-400">
+                        {members.length} member{members.length !== 1 ? 's' : ''}
+                      </span>
+                    </h2>
+                    {groupDetails?.invite_code && (
+                      <span
+                        className="text-xs font-mono font-bold tracking-widest text-stone-500 bg-stone-100 px-2.5 py-1 rounded-lg cursor-pointer hover:bg-stone-200 transition-colors"
+                        title="Click to copy invite link"
+                        onClick={() => {
+                          navigator.clipboard.writeText(`https://app.coveyspace.com/login?code=${groupDetails.invite_code}`)
+                          showToast('Invite link copied!')
+                        }}
+                      >
+                        {groupDetails.invite_code}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <button
+                      onClick={() => { setBroadcastGroupName(selectedGroup.name); setBroadcastTarget(selectedGroup.id) }}
+                      className="px-3 py-1.5 text-xs font-medium rounded-xl bg-stone-100 text-stone-600 hover:bg-stone-200 transition-colors"
+                    >
+                      📣 Broadcast
+                    </button>
+                    <button
+                      onClick={() => exportCSV(selectedGroup.name, members)}
+                      disabled={members.length === 0}
+                      className="px-3 py-1.5 text-xs font-medium rounded-xl bg-stone-100 text-stone-600 hover:bg-stone-200 transition-colors disabled:opacity-40"
+                    >
+                      Export CSV
+                    </button>
+                  </div>
+                </div>
+                {groupDetails?.settings && (
+                  <FeatureFlags settings={groupDetails.settings} />
+                )}
               </div>
 
               {displayedMembers.length === 0 ? (
@@ -510,15 +881,9 @@ export default function DashboardClient({ initialGroups }) {
                             )}
                           </td>
                           <td className="px-5 py-3 text-stone-500">{member.email || '—'}</td>
-                          <td className="px-5 py-3">
-                            <Badge role={member.role} />
-                          </td>
-                          <td className="px-5 py-3 text-xs text-stone-400 whitespace-nowrap">
-                            {formatTime(member.last_active_at)}
-                          </td>
-                          <td className="px-5 py-3 text-xs text-stone-400 whitespace-nowrap">
-                            {formatTime(member.last_sign_in_at)}
-                          </td>
+                          <td className="px-5 py-3"><Badge role={member.role} /></td>
+                          <td className="px-5 py-3 text-xs text-stone-400 whitespace-nowrap">{formatTime(member.last_active_at)}</td>
+                          <td className="px-5 py-3 text-xs text-stone-400 whitespace-nowrap">{formatTime(member.last_sign_in_at)}</td>
                           <td className="px-5 py-3 w-56">
                             <div className="flex flex-nowrap items-center gap-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
                               <button
