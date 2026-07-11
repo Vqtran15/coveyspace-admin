@@ -22,6 +22,7 @@ import {
   loadMetricsAction,
 } from '@/actions/admin'
 import { logoutAction } from '@/actions/auth'
+import { loadGA4MetricsAction } from '@/actions/analytics'
 
 const PT = 'America/Los_Angeles'
 
@@ -210,6 +211,8 @@ export default function DashboardClient({ initialGroups }) {
   const [loadingMetrics, setLoadingMetrics] = useState(false)
   const [showMetrics, setShowMetrics]   = useState(true)
   const [groupSort, setGroupSort]       = useState({ col: 'lastActivity', dir: 'desc' })
+  const [ga4, setGa4]                   = useState(null)
+  const [loadingGa4, setLoadingGa4]     = useState(false)
 
   const [showBanner, setShowBanner] = useState(false)
   const [announcements, setAnnouncements] = useState(null)
@@ -295,12 +298,30 @@ export default function DashboardClient({ initialGroups }) {
     setShowOrphans(false)
     setShowBanner(false)
     setShowMetrics(true)
-    if (metrics) return
-    setLoadingMetrics(true)
-    const { data, error } = await loadMetricsAction()
-    if (error) showToast(error, 'error')
-    else setMetrics(data)
-    setLoadingMetrics(false)
+    const loads = []
+    if (!metrics) {
+      loads.push(
+        (async () => {
+          setLoadingMetrics(true)
+          const { data, error } = await loadMetricsAction()
+          if (error) showToast(error, 'error')
+          else setMetrics(data)
+          setLoadingMetrics(false)
+        })()
+      )
+    }
+    if (!ga4) {
+      loads.push(
+        (async () => {
+          setLoadingGa4(true)
+          const { data, error } = await loadGA4MetricsAction()
+          if (error) showToast('Analytics: ' + error, 'error')
+          else setGa4(data)
+          setLoadingGa4(false)
+        })()
+      )
+    }
+    await Promise.all(loads)
   }
 
   async function handleSelectOrphans() {
@@ -1062,14 +1083,20 @@ export default function DashboardClient({ initialGroups }) {
                 <button
                   onClick={async () => {
                     setLoadingMetrics(true)
-                    const { data } = await loadMetricsAction()
-                    if (data) setMetrics(data)
+                    setLoadingGa4(true)
+                    const [{ data: mData }, { data: gData }] = await Promise.all([
+                      loadMetricsAction(),
+                      loadGA4MetricsAction(),
+                    ])
+                    if (mData) setMetrics(mData)
+                    if (gData) setGa4(gData)
                     setLoadingMetrics(false)
+                    setLoadingGa4(false)
                   }}
-                  disabled={loadingMetrics}
+                  disabled={loadingMetrics || loadingGa4}
                   className="text-xs text-stone-400 hover:text-stone-600 transition-colors disabled:opacity-40"
                 >
-                  {loadingMetrics ? 'Refreshing…' : 'Refresh'}
+                  {(loadingMetrics || loadingGa4) ? 'Refreshing…' : 'Refresh'}
                 </button>
               </div>
 
@@ -1146,6 +1173,83 @@ export default function DashboardClient({ initialGroups }) {
                       </div>
                     )
                   })()}
+
+                  {/* GA4 Analytics */}
+                  {ga4 ? (
+                    <div className="mt-8 space-y-6">
+                      <h3 className="text-xs font-semibold text-stone-500 uppercase tracking-wider">App Analytics — last 30 days</h3>
+
+                      {/* Active user scorecards */}
+                      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                        {[
+                          { label: 'Active Users (7d)',  value: ga4.activeUsers7d.toLocaleString() },
+                          { label: 'Active Users (30d)', value: ga4.activeUsers30d.toLocaleString() },
+                          { label: 'New Sign-ups',       value: ga4.signups30d.toLocaleString() },
+                          { label: 'Logins',             value: ga4.logins30d.toLocaleString() },
+                        ].map(({ label, value }) => (
+                          <div key={label} className="bg-white rounded-2xl border border-stone-100 px-5 py-4 shadow-sm">
+                            <p className="text-xs font-semibold text-stone-400 uppercase tracking-wider mb-1">{label}</p>
+                            <p className="text-3xl font-bold text-stone-800">{value}</p>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Feature usage + Tab popularity side by side */}
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        {/* Feature usage */}
+                        <div>
+                          <h4 className="text-xs font-semibold text-stone-500 uppercase tracking-wider mb-3">Feature Events</h4>
+                          <div className="bg-white rounded-2xl border border-stone-100 shadow-sm overflow-hidden">
+                            {[
+                              { label: 'Chat Messages',    value: ga4.chatMessages30d },
+                              { label: 'Prayer Requests',  value: ga4.prayerRequests30d },
+                              { label: 'Schedule Sign-ups',value: ga4.scheduleSignups30d },
+                              { label: 'Push Opt-ins',     value: ga4.pushOptIns30d },
+                            ].map(({ label, value }) => {
+                              const max = Math.max(ga4.chatMessages30d, ga4.prayerRequests30d, ga4.scheduleSignups30d, ga4.pushOptIns30d, 1)
+                              const pct = Math.round((value / max) * 100)
+                              return (
+                                <div key={label} className="flex items-center gap-3 px-4 py-3 border-b border-stone-50 last:border-0">
+                                  <span className="text-sm text-stone-700 w-36 shrink-0">{label}</span>
+                                  <div className="flex-1 bg-stone-100 rounded-full h-1.5">
+                                    <div className="bg-blue-400 h-1.5 rounded-full" style={{ width: `${pct}%` }} />
+                                  </div>
+                                  <span className="text-xs text-stone-400 w-12 text-right tabular-nums">{value.toLocaleString()}</span>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </div>
+
+                        {/* Tab popularity */}
+                        {ga4.tabs.length > 0 && (
+                          <div>
+                            <h4 className="text-xs font-semibold text-stone-500 uppercase tracking-wider mb-3">Tab Popularity</h4>
+                            <div className="bg-white rounded-2xl border border-stone-100 shadow-sm overflow-hidden">
+                              {ga4.tabs.map((t, i) => {
+                                const max = ga4.tabs[0].count || 1
+                                const pct = Math.round((t.count / max) * 100)
+                                return (
+                                  <div key={i} className="flex items-center gap-3 px-4 py-3 border-b border-stone-50 last:border-0">
+                                    <span className="text-sm text-stone-700 w-28 shrink-0 capitalize">{t.name}</span>
+                                    <div className="flex-1 bg-stone-100 rounded-full h-1.5">
+                                      <div className="bg-violet-400 h-1.5 rounded-full" style={{ width: `${pct}%` }} />
+                                    </div>
+                                    <span className="text-xs text-stone-400 w-12 text-right tabular-nums">{t.count.toLocaleString()}</span>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ) : loadingGa4 ? (
+                    <div className="mt-8 flex items-center gap-2 text-stone-400">
+                      <div className="w-3.5 h-3.5 rounded-full border-2 border-stone-200 border-t-stone-400 animate-spin" />
+                      <p className="text-sm">Loading analytics…</p>
+                    </div>
+                  ) : null}
                 </>
               ) : null}
             </div>
