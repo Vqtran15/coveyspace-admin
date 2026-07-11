@@ -4,12 +4,8 @@ let _client = null
 
 export function getGA4Client() {
   if (!_client) {
-    _client = new BetaAnalyticsDataClient({
-      credentials: {
-        client_email: process.env.GA4_CLIENT_EMAIL,
-        private_key: process.env.GA4_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-      },
-    })
+    const credentials = JSON.parse(process.env.GA4_SERVICE_ACCOUNT_KEY)
+    _client = new BetaAnalyticsDataClient({ credentials })
   }
   return _client
 }
