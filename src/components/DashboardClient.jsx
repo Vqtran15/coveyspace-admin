@@ -39,6 +39,20 @@ function formatDate(iso) {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: PT })
 }
 
+function timeAgo(iso) {
+  if (!iso) return '—'
+  const ms = Date.now() - new Date(iso).getTime()
+  const m = Math.floor(ms / 60000)
+  if (m < 2) return 'just now'
+  if (m < 60) return `${m}m ago`
+  const h = Math.floor(m / 60)
+  if (h < 24) return `${h}h ago`
+  const d = Math.floor(h / 24)
+  if (d < 30) return `${d}d ago`
+  const mo = Math.floor(d / 30)
+  return `${mo}mo ago`
+}
+
 function Badge({ role }) {
   if (role === 'admin') return (
     <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-jade/10 text-jade border border-jade/20">
@@ -195,6 +209,7 @@ export default function DashboardClient({ initialGroups }) {
   const [metrics, setMetrics]           = useState(null)
   const [loadingMetrics, setLoadingMetrics] = useState(false)
   const [showMetrics, setShowMetrics]   = useState(true)
+  const [groupSort, setGroupSort]       = useState({ col: 'lastActivity', dir: 'desc' })
 
   const [showBanner, setShowBanner] = useState(false)
   const [announcements, setAnnouncements] = useState(null)
@@ -228,6 +243,19 @@ export default function DashboardClient({ initialGroups }) {
   const broadcastAnim   = useAnimatedMount(!!broadcastTarget, 150)
   const menuAnim        = useAnimatedMount(showMenu, 220)
   const groupMenuAnim   = useAnimatedMount(showGroupMenu, 110)
+
+  const sortedGroupStats = useMemo(() => {
+    if (!metrics?.groupStats) return []
+    return [...metrics.groupStats].sort((a, b) => {
+      const { col, dir } = groupSort
+      const av = a[col], bv = b[col]
+      if (av == null && bv == null) return 0
+      if (av == null) return 1
+      if (bv == null) return -1
+      const cmp = av < bv ? -1 : av > bv ? 1 : 0
+      return dir === 'desc' ? -cmp : cmp
+    })
+  }, [metrics, groupSort])
 
   function showToast(msg, type = 'success') {
     setToast({ msg, type })
@@ -1069,72 +1097,55 @@ export default function DashboardClient({ initialGroups }) {
                     ))}
                   </div>
 
-                  {/* Two-column charts */}
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {/* Largest Groups */}
-                    {metrics.topGroups.length > 0 && (
-                      <div>
-                        <h3 className="text-xs font-semibold text-stone-500 uppercase tracking-wider mb-3">Largest Groups</h3>
-                        <div className="bg-white rounded-2xl border border-stone-100 shadow-sm overflow-hidden">
-                          {metrics.topGroups.map((g, i) => {
-                            const max = metrics.topGroups[0].members || 1
-                            const pct = Math.round((g.members / max) * 100)
-                            return (
-                              <div
+                  {/* Sortable group table */}
+                  {sortedGroupStats.length > 0 && (() => {
+                    const SortTh = ({ col, label, right = false }) => {
+                      const active = groupSort.col === col
+                      return (
+                        <th
+                          onClick={() => setGroupSort(s => ({ col, dir: s.col === col && s.dir === 'desc' ? 'asc' : 'desc' }))}
+                          className={`py-3 px-4 text-xs font-semibold uppercase tracking-wider cursor-pointer select-none whitespace-nowrap transition-colors ${right ? 'text-right' : 'text-left'} ${active ? 'text-stone-700' : 'text-stone-400 hover:text-stone-600'}`}
+                        >
+                          {label}{active ? (groupSort.dir === 'desc' ? ' ↓' : ' ↑') : ''}
+                        </th>
+                      )
+                    }
+                    return (
+                      <div className="bg-white rounded-2xl border border-stone-100 shadow-sm overflow-x-auto">
+                        <table className="w-full">
+                          <thead className="border-b border-stone-100">
+                            <tr>
+                              <SortTh col="name"         label="Group" />
+                              <SortTh col="members"      label="Members"       right />
+                              <SortTh col="messages"     label="Messages"      right />
+                              <SortTh col="lastActivity" label="Last Activity" right />
+                              <SortTh col="lastLogin"    label="Last Login"    right />
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {sortedGroupStats.map((g, i) => (
+                              <tr
                                 key={i}
-                                className="flex items-center gap-3 px-4 py-3 border-b border-stone-50 last:border-0 cursor-pointer hover:bg-stone-50 transition-colors"
+                                className="border-b border-stone-50 last:border-0 hover:bg-stone-50 transition-colors cursor-pointer"
                                 onClick={() => {
                                   const match = groups.find(gr => gr.name === g.name)
                                   if (match) selectGroup(match)
                                 }}
                               >
-                                <span className="text-xs text-stone-300 w-4 shrink-0 text-right">{i + 1}</span>
-                                <span className="text-sm font-medium text-stone-800 w-32 shrink-0 truncate">{g.name}</span>
-                                <div className="flex-1 bg-stone-100 rounded-full h-1.5">
-                                  <div className="bg-jade h-1.5 rounded-full" style={{ width: `${pct}%` }} />
-                                </div>
-                                <span className="text-xs text-stone-400 shrink-0 w-16 text-right">
-                                  {g.members} member{g.members !== 1 ? 's' : ''}
-                                </span>
-                              </div>
-                            )
-                          })}
-                        </div>
+                                <td className="py-3 px-4 text-sm font-medium text-stone-800 max-w-[200px]">
+                                  <span className="block truncate">{g.name}</span>
+                                </td>
+                                <td className="py-3 px-4 text-sm text-stone-600 text-right tabular-nums">{g.members}</td>
+                                <td className="py-3 px-4 text-sm text-stone-600 text-right tabular-nums">{g.messages.toLocaleString()}</td>
+                                <td className="py-3 px-4 text-sm text-stone-500 text-right whitespace-nowrap" title={formatTime(g.lastActivity)}>{timeAgo(g.lastActivity)}</td>
+                                <td className="py-3 px-4 text-sm text-stone-500 text-right whitespace-nowrap" title={formatTime(g.lastLogin)}>{timeAgo(g.lastLogin)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
                       </div>
-                    )}
-
-                    {/* Messages per Group */}
-                    {metrics.messagesPerGroup.length > 0 && (
-                      <div>
-                        <h3 className="text-xs font-semibold text-stone-500 uppercase tracking-wider mb-3">Most Active Groups</h3>
-                        <div className="bg-white rounded-2xl border border-stone-100 shadow-sm overflow-hidden">
-                          {metrics.messagesPerGroup.map((g, i) => {
-                            const max = metrics.messagesPerGroup[0].count || 1
-                            const pct = Math.round((g.count / max) * 100)
-                            return (
-                              <div
-                                key={i}
-                                className="flex items-center gap-3 px-4 py-3 border-b border-stone-50 last:border-0 cursor-pointer hover:bg-stone-50 transition-colors"
-                                onClick={() => {
-                                  const match = groups.find(gr => gr.name === g.name)
-                                  if (match) selectGroup(match)
-                                }}
-                              >
-                                <span className="text-xs text-stone-300 w-4 shrink-0 text-right">{i + 1}</span>
-                                <span className="text-sm font-medium text-stone-800 w-32 shrink-0 truncate">{g.name}</span>
-                                <div className="flex-1 bg-stone-100 rounded-full h-1.5">
-                                  <div className="bg-amber-400 h-1.5 rounded-full" style={{ width: `${pct}%` }} />
-                                </div>
-                                <span className="text-xs text-stone-400 shrink-0 w-16 text-right">
-                                  {g.count.toLocaleString()} msg{g.count !== 1 ? 's' : ''}
-                                </span>
-                              </div>
-                            )
-                          })}
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                    )
+                  })()}
                 </>
               ) : null}
             </div>

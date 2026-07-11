@@ -295,7 +295,9 @@ export async function loadMetricsAction() {
     { count: messages7d },
     { count: messages30d },
     { data: groupsWithMembers },
-    { data: convMsgData },
+    { data: convData },
+    { data: profilesData },
+    { data: authData },
   ] = await Promise.all([
     sb.from('community_groups').select('*', { count: 'exact', head: true }),
     sb.from('profiles').select('*', { count: 'exact', head: true }),
@@ -303,25 +305,36 @@ export async function loadMetricsAction() {
     sb.from('profiles').select('*', { count: 'exact', head: true }).gte('created_at', d30),
     sb.from('messages').select('*', { count: 'exact', head: true }).gte('created_at', d7),
     sb.from('messages').select('*', { count: 'exact', head: true }).gte('created_at', d30),
-    sb.from('community_groups').select('name, created_at, profiles(count)').order('created_at', { ascending: false }),
-    sb.from('conversations').select('community_group_id, community_groups(name), messages(count)'),
+    sb.from('community_groups').select('id, name, created_at, profiles(count)').order('created_at', { ascending: false }),
+    sb.from('conversations').select('community_group_id, updated_at, messages(count)'),
+    sb.from('profiles').select('user_id, community_group_id'),
+    sb.auth.admin.listUsers({ perPage: 1000 }),
   ])
 
-  const topGroups = (groupsWithMembers ?? [])
-    .map(g => ({ name: g.name, members: g.profiles?.[0]?.count ?? 0, created_at: g.created_at }))
-    .sort((a, b) => b.members - a.members)
-    .slice(0, 8)
-
-  const groupMsgMap = {}
-  for (const conv of convMsgData ?? []) {
-    const name = conv.community_groups?.name
-    if (!name) continue
-    groupMsgMap[name] = (groupMsgMap[name] ?? 0) + (conv.messages?.[0]?.count ?? 0)
+  // Build per-group stats keyed by group id
+  const statsMap = {}
+  for (const g of groupsWithMembers ?? []) {
+    statsMap[g.id] = {
+      name: g.name,
+      members: g.profiles?.[0]?.count ?? 0,
+      messages: 0,
+      lastActivity: null,
+      lastLogin: null,
+    }
   }
-  const messagesPerGroup = Object.entries(groupMsgMap)
-    .map(([name, count]) => ({ name, count }))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 10)
+  for (const conv of convData ?? []) {
+    const s = statsMap[conv.community_group_id]
+    if (!s) continue
+    s.messages += conv.messages?.[0]?.count ?? 0
+    if (!s.lastActivity || conv.updated_at > s.lastActivity) s.lastActivity = conv.updated_at
+  }
+  const userGroupMap = Object.fromEntries((profilesData ?? []).map(p => [p.user_id, p.community_group_id]))
+  for (const user of authData?.users ?? []) {
+    const s = statsMap[userGroupMap[user.id]]
+    if (!s || !user.last_sign_in_at) continue
+    if (!s.lastLogin || user.last_sign_in_at > s.lastLogin) s.lastLogin = user.last_sign_in_at
+  }
+  const groupStats = Object.values(statsMap)
 
   return {
     data: {
@@ -331,8 +344,7 @@ export async function loadMetricsAction() {
       newMembers30d: newMembers30d ?? 0,
       messages7d:  messages7d  ?? 0,
       messages30d: messages30d ?? 0,
-      topGroups,
-      messagesPerGroup,
+      groupStats,
     }
   }
 }
