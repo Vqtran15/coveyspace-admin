@@ -16,18 +16,7 @@ export async function loadGA4MetricsAction() {
   try {
     const client = getGA4Client()
 
-    const [tabResult, eventResult, users7dResult, users30dResult] = await Promise.all([
-      // Tab views by tab name (30d)
-      client.runReport({
-        property: GA4_PROPERTY,
-        dateRanges: [{ startDate: '30daysAgo', endDate: 'today' }],
-        dimensions: [{ name: 'customEvent:tab_name' }],
-        metrics: [{ name: 'eventCount' }],
-        dimensionFilter: {
-          filter: { fieldName: 'eventName', stringFilter: { matchType: 'EXACT', value: 'tab_view' } },
-        },
-        orderBys: [{ metric: { metricName: 'eventCount' }, desc: true }],
-      }),
+    const [eventResult, users7dResult, users30dResult] = await Promise.all([
       // Feature event counts (30d)
       client.runReport({
         property: GA4_PROPERTY,
@@ -38,7 +27,7 @@ export async function loadGA4MetricsAction() {
           filter: {
             fieldName: 'eventName',
             inListFilter: {
-              values: ['sign_up', 'login', 'chat_message_sent', 'prayer_request_added', 'schedule_signup', 'push_notifications_enabled'],
+              values: ['sign_up', 'login', 'chat_message_sent', 'prayer_request_added', 'schedule_signup', 'push_notifications_enabled', 'tab_view'],
             },
           },
         },
@@ -59,13 +48,6 @@ export async function loadGA4MetricsAction() {
 
     const eventMap = rowsToMap(eventResult[0].rows)
 
-    const tabs = (tabResult[0].rows ?? [])
-      .filter(r => r.dimensionValues[0].value !== '(not set)')
-      .map(r => ({
-        name: r.dimensionValues[0].value,
-        count: parseInt(r.metricValues[0].value, 10),
-      }))
-
     return {
       data: {
         activeUsers7d:      parseInt(users7dResult[0].rows?.[0]?.metricValues?.[0]?.value  ?? '0', 10),
@@ -76,7 +58,7 @@ export async function loadGA4MetricsAction() {
         prayerRequests30d:  eventMap['prayer_request_added']       ?? 0,
         scheduleSignups30d: eventMap['schedule_signup']            ?? 0,
         pushOptIns30d:      eventMap['push_notifications_enabled'] ?? 0,
-        tabs,
+        tabViews30d:        eventMap['tab_view']                   ?? 0,
       },
     }
   } catch (e) {

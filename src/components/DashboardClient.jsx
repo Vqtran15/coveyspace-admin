@@ -1194,54 +1194,30 @@ export default function DashboardClient({ initialGroups }) {
                         ))}
                       </div>
 
-                      {/* Feature usage + Tab popularity side by side */}
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        {/* Feature usage */}
-                        <div>
-                          <h4 className="text-xs font-semibold text-stone-500 uppercase tracking-wider mb-3">Feature Events</h4>
-                          <div className="bg-white rounded-2xl border border-stone-100 shadow-sm overflow-hidden">
-                            {[
-                              { label: 'Chat Messages',    value: ga4.chatMessages30d },
-                              { label: 'Prayer Requests',  value: ga4.prayerRequests30d },
-                              { label: 'Schedule Sign-ups',value: ga4.scheduleSignups30d },
-                              { label: 'Push Opt-ins',     value: ga4.pushOptIns30d },
-                            ].map(({ label, value }) => {
-                              const max = Math.max(ga4.chatMessages30d, ga4.prayerRequests30d, ga4.scheduleSignups30d, ga4.pushOptIns30d, 1)
-                              const pct = Math.round((value / max) * 100)
-                              return (
-                                <div key={label} className="flex items-center gap-3 px-4 py-3 border-b border-stone-50 last:border-0">
-                                  <span className="text-sm text-stone-700 w-36 shrink-0">{label}</span>
-                                  <div className="flex-1 bg-stone-100 rounded-full h-1.5">
-                                    <div className="bg-blue-400 h-1.5 rounded-full" style={{ width: `${pct}%` }} />
-                                  </div>
-                                  <span className="text-xs text-stone-400 w-12 text-right tabular-nums">{value.toLocaleString()}</span>
+                      {/* Feature usage */}
+                      <div>
+                        <h4 className="text-xs font-semibold text-stone-500 uppercase tracking-wider mb-3">Feature Events</h4>
+                        <div className="bg-white rounded-2xl border border-stone-100 shadow-sm overflow-hidden">
+                          {[
+                            { label: 'Tab Views',         value: ga4.tabViews30d },
+                            { label: 'Chat Messages',     value: ga4.chatMessages30d },
+                            { label: 'Prayer Requests',   value: ga4.prayerRequests30d },
+                            { label: 'Schedule Sign-ups', value: ga4.scheduleSignups30d },
+                            { label: 'Push Opt-ins',      value: ga4.pushOptIns30d },
+                          ].map(({ label, value }) => {
+                            const max = Math.max(ga4.tabViews30d, ga4.chatMessages30d, ga4.prayerRequests30d, ga4.scheduleSignups30d, ga4.pushOptIns30d, 1)
+                            const pct = Math.round((value / max) * 100)
+                            return (
+                              <div key={label} className="flex items-center gap-3 px-4 py-3 border-b border-stone-50 last:border-0">
+                                <span className="text-sm text-stone-700 w-36 shrink-0">{label}</span>
+                                <div className="flex-1 bg-stone-100 rounded-full h-1.5">
+                                  <div className="bg-blue-400 h-1.5 rounded-full" style={{ width: `${pct}%` }} />
                                 </div>
-                              )
-                            })}
-                          </div>
+                                <span className="text-xs text-stone-400 w-16 text-right tabular-nums">{value.toLocaleString()}</span>
+                              </div>
+                            )
+                          })}
                         </div>
-
-                        {/* Tab popularity */}
-                        {ga4.tabs.length > 0 && (
-                          <div>
-                            <h4 className="text-xs font-semibold text-stone-500 uppercase tracking-wider mb-3">Tab Popularity</h4>
-                            <div className="bg-white rounded-2xl border border-stone-100 shadow-sm overflow-hidden">
-                              {ga4.tabs.map((t, i) => {
-                                const max = ga4.tabs[0].count || 1
-                                const pct = Math.round((t.count / max) * 100)
-                                return (
-                                  <div key={i} className="flex items-center gap-3 px-4 py-3 border-b border-stone-50 last:border-0">
-                                    <span className="text-sm text-stone-700 w-28 shrink-0 capitalize">{t.name}</span>
-                                    <div className="flex-1 bg-stone-100 rounded-full h-1.5">
-                                      <div className="bg-violet-400 h-1.5 rounded-full" style={{ width: `${pct}%` }} />
-                                    </div>
-                                    <span className="text-xs text-stone-400 w-12 text-right tabular-nums">{t.count.toLocaleString()}</span>
-                                  </div>
-                                )
-                              })}
-                            </div>
-                          </div>
-                        )}
                       </div>
                     </div>
                   ) : loadingGa4 ? (
