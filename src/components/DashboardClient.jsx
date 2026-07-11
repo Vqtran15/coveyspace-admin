@@ -1176,64 +1176,87 @@ export default function DashboardClient({ initialGroups }) {
 
                   {/* GA4 Analytics */}
                   {ga4 ? (
-                    <div className="mt-8 space-y-6">
-                      <h3 className="text-xs font-semibold text-stone-500 uppercase tracking-wider">App Analytics — last 30 days</h3>
+                    <div className="mt-8 space-y-8">
 
-                      {/* Active user scorecards */}
-                      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                        {[
-                          { label: 'Active Users (7d)',  value: ga4.activeUsers7d.toLocaleString() },
-                          { label: 'Active Users (30d)', value: ga4.activeUsers30d.toLocaleString() },
-                          { label: 'New Sign-ups',       value: ga4.signups30d.toLocaleString() },
-                          { label: 'Logins',             value: ga4.logins30d.toLocaleString() },
-                        ].map(({ label, value }) => (
-                          <div key={label} className="bg-white rounded-2xl border border-stone-100 px-5 py-4 shadow-sm">
-                            <p className="text-xs font-semibold text-stone-400 uppercase tracking-wider mb-1">{label}</p>
-                            <p className="text-3xl font-bold text-stone-800">{value}</p>
-                          </div>
-                        ))}
-                      </div>
+                      {/* ── app.coveyspace.com ── */}
+                      <div className="space-y-6">
+                        <h3 className="text-xs font-semibold text-stone-500 uppercase tracking-wider">app.coveyspace.com — last 30 days</h3>
 
-                      {/* Feature usage + Tab popularity */}
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <div>
-                          <h4 className="text-xs font-semibold text-stone-500 uppercase tracking-wider mb-3">Feature Events</h4>
-                          <div className="bg-white rounded-2xl border border-stone-100 shadow-sm overflow-hidden">
-                            {[
-                              { label: 'Chat Messages',     value: ga4.chatMessages30d },
-                              { label: 'Prayer Requests',   value: ga4.prayerRequests30d },
-                              { label: 'Schedule Sign-ups', value: ga4.scheduleSignups30d },
-                              { label: 'Push Opt-ins',      value: ga4.pushOptIns30d },
-                            ].map(({ label, value }) => {
-                              const max = Math.max(ga4.chatMessages30d, ga4.prayerRequests30d, ga4.scheduleSignups30d, ga4.pushOptIns30d, 1)
-                              const pct = Math.round((value / max) * 100)
-                              return (
-                                <div key={label} className="flex items-center gap-3 px-4 py-3 border-b border-stone-50 last:border-0">
-                                  <span className="text-sm text-stone-700 w-36 shrink-0">{label}</span>
-                                  <div className="flex-1 bg-stone-100 rounded-full h-1.5">
-                                    <div className="bg-blue-400 h-1.5 rounded-full" style={{ width: `${pct}%` }} />
-                                  </div>
-                                  <span className="text-xs text-stone-400 w-12 text-right tabular-nums">{value.toLocaleString()}</span>
-                                </div>
-                              )
-                            })}
-                          </div>
+                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                          {[
+                            { label: 'Active Users (7d)',  value: ga4.app.activeUsers7d.toLocaleString() },
+                            { label: 'Active Users (30d)', value: ga4.app.activeUsers30d.toLocaleString() },
+                            { label: 'New Sign-ups',       value: ga4.app.signups30d.toLocaleString() },
+                            { label: 'Logins',             value: ga4.app.logins30d.toLocaleString() },
+                          ].map(({ label, value }) => (
+                            <div key={label} className="bg-white rounded-2xl border border-stone-100 px-5 py-4 shadow-sm">
+                              <p className="text-xs font-semibold text-stone-400 uppercase tracking-wider mb-1">{label}</p>
+                              <p className="text-3xl font-bold text-stone-800">{value}</p>
+                            </div>
+                          ))}
                         </div>
 
-                        {ga4.tabs.length > 0 && (
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                           <div>
-                            <h4 className="text-xs font-semibold text-stone-500 uppercase tracking-wider mb-3">Tab Popularity</h4>
+                            <h4 className="text-xs font-semibold text-stone-500 uppercase tracking-wider mb-3">Feature Events</h4>
                             <div className="bg-white rounded-2xl border border-stone-100 shadow-sm overflow-hidden">
-                              {ga4.tabs.map((t, i) => {
-                                const max = ga4.tabs[0].count || 1
-                                const pct = Math.round((t.count / max) * 100)
+                              {[
+                                { label: 'Chat Messages',     value: ga4.app.chatMessages30d },
+                                { label: 'Prayer Requests',   value: ga4.app.prayerRequests30d },
+                                { label: 'Schedule Sign-ups', value: ga4.app.scheduleSignups30d },
+                                { label: 'Push Opt-ins',      value: ga4.app.pushOptIns30d },
+                              ].map(({ label, value }) => {
+                                const max = Math.max(ga4.app.chatMessages30d, ga4.app.prayerRequests30d, ga4.app.scheduleSignups30d, ga4.app.pushOptIns30d, 1)
+                                const pct = Math.round((value / max) * 100)
+                                return (
+                                  <div key={label} className="flex items-center gap-3 px-4 py-3 border-b border-stone-50 last:border-0">
+                                    <span className="text-sm text-stone-700 w-36 shrink-0">{label}</span>
+                                    <div className="flex-1 bg-stone-100 rounded-full h-1.5">
+                                      <div className="bg-blue-400 h-1.5 rounded-full" style={{ width: `${pct}%` }} />
+                                    </div>
+                                    <span className="text-xs text-stone-400 w-12 text-right tabular-nums">{value.toLocaleString()}</span>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          </div>
+
+                          {ga4.app.tabs.length > 0 && (
+                            <div>
+                              <h4 className="text-xs font-semibold text-stone-500 uppercase tracking-wider mb-3">Tab Popularity</h4>
+                              <div className="bg-white rounded-2xl border border-stone-100 shadow-sm overflow-hidden">
+                                {ga4.app.tabs.map((t, i) => {
+                                  const max = ga4.app.tabs[0].count || 1
+                                  const pct = Math.round((t.count / max) * 100)
+                                  return (
+                                    <div key={i} className="flex items-center gap-3 px-4 py-3 border-b border-stone-50 last:border-0">
+                                      <span className="text-sm text-stone-700 w-28 shrink-0 capitalize">{t.name}</span>
+                                      <div className="flex-1 bg-stone-100 rounded-full h-1.5">
+                                        <div className="bg-violet-400 h-1.5 rounded-full" style={{ width: `${pct}%` }} />
+                                      </div>
+                                      <span className="text-xs text-stone-400 w-12 text-right tabular-nums">{t.count.toLocaleString()}</span>
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {ga4.app.signupMethods.length > 0 && (
+                          <div className="max-w-sm">
+                            <h4 className="text-xs font-semibold text-stone-500 uppercase tracking-wider mb-3">Sign-up Method</h4>
+                            <div className="bg-white rounded-2xl border border-stone-100 shadow-sm overflow-hidden">
+                              {ga4.app.signupMethods.map((m, i) => {
+                                const max = ga4.app.signupMethods[0].count || 1
+                                const pct = Math.round((m.count / max) * 100)
                                 return (
                                   <div key={i} className="flex items-center gap-3 px-4 py-3 border-b border-stone-50 last:border-0">
-                                    <span className="text-sm text-stone-700 w-28 shrink-0 capitalize">{t.name}</span>
+                                    <span className="text-sm text-stone-700 w-28 shrink-0 capitalize">{m.name}</span>
                                     <div className="flex-1 bg-stone-100 rounded-full h-1.5">
-                                      <div className="bg-violet-400 h-1.5 rounded-full" style={{ width: `${pct}%` }} />
+                                      <div className="bg-amber-400 h-1.5 rounded-full" style={{ width: `${pct}%` }} />
                                     </div>
-                                    <span className="text-xs text-stone-400 w-12 text-right tabular-nums">{t.count.toLocaleString()}</span>
+                                    <span className="text-xs text-stone-400 w-12 text-right tabular-nums">{m.count.toLocaleString()}</span>
                                   </div>
                                 )
                               })}
@@ -1242,52 +1265,43 @@ export default function DashboardClient({ initialGroups }) {
                         )}
                       </div>
 
-                      {/* Sign-up method + CTA clicks */}
-                      {(ga4.signupMethods.length > 0 || ga4.ctaClicks.length > 0) && (
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                          {ga4.signupMethods.length > 0 && (
-                            <div>
-                              <h4 className="text-xs font-semibold text-stone-500 uppercase tracking-wider mb-3">Sign-up Method</h4>
-                              <div className="bg-white rounded-2xl border border-stone-100 shadow-sm overflow-hidden">
-                                {ga4.signupMethods.map((m, i) => {
-                                  const max = ga4.signupMethods[0].count || 1
-                                  const pct = Math.round((m.count / max) * 100)
-                                  return (
-                                    <div key={i} className="flex items-center gap-3 px-4 py-3 border-b border-stone-50 last:border-0">
-                                      <span className="text-sm text-stone-700 w-28 shrink-0 capitalize">{m.name}</span>
-                                      <div className="flex-1 bg-stone-100 rounded-full h-1.5">
-                                        <div className="bg-amber-400 h-1.5 rounded-full" style={{ width: `${pct}%` }} />
-                                      </div>
-                                      <span className="text-xs text-stone-400 w-12 text-right tabular-nums">{m.count.toLocaleString()}</span>
-                                    </div>
-                                  )
-                                })}
-                              </div>
-                            </div>
-                          )}
+                      {/* ── www.coveyspace.com ── */}
+                      <div className="space-y-6 pt-2 border-t border-stone-100">
+                        <h3 className="text-xs font-semibold text-stone-500 uppercase tracking-wider pt-4">www.coveyspace.com — last 30 days</h3>
 
-                          {ga4.ctaClicks.length > 0 && (
-                            <div>
-                              <h4 className="text-xs font-semibold text-stone-500 uppercase tracking-wider mb-3">Landing CTA Clicks</h4>
-                              <div className="bg-white rounded-2xl border border-stone-100 shadow-sm overflow-hidden">
-                                {ga4.ctaClicks.map((c, i) => {
-                                  const max = ga4.ctaClicks[0].count || 1
-                                  const pct = Math.round((c.count / max) * 100)
-                                  return (
-                                    <div key={i} className="flex items-center gap-3 px-4 py-3 border-b border-stone-50 last:border-0">
-                                      <span className="text-sm text-stone-700 w-36 shrink-0 capitalize">{c.page} · {c.location}</span>
-                                      <div className="flex-1 bg-stone-100 rounded-full h-1.5">
-                                        <div className="bg-jade h-1.5 rounded-full" style={{ width: `${pct}%` }} />
-                                      </div>
-                                      <span className="text-xs text-stone-400 w-12 text-right tabular-nums">{c.count.toLocaleString()}</span>
-                                    </div>
-                                  )
-                                })}
-                              </div>
-                            </div>
-                          )}
+                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                          <div className="bg-white rounded-2xl border border-stone-100 px-5 py-4 shadow-sm">
+                            <p className="text-xs font-semibold text-stone-400 uppercase tracking-wider mb-1">Active Users (30d)</p>
+                            <p className="text-3xl font-bold text-stone-800">{ga4.landing.activeUsers30d.toLocaleString()}</p>
+                          </div>
+                          <div className="bg-white rounded-2xl border border-stone-100 px-5 py-4 shadow-sm">
+                            <p className="text-xs font-semibold text-stone-400 uppercase tracking-wider mb-1">CTA Clicks (30d)</p>
+                            <p className="text-3xl font-bold text-stone-800">{ga4.landing.ctaClicks.reduce((s, c) => s + c.count, 0).toLocaleString()}</p>
+                          </div>
                         </div>
-                      )}
+
+                        {ga4.landing.ctaClicks.length > 0 && (
+                          <div className="max-w-sm">
+                            <h4 className="text-xs font-semibold text-stone-500 uppercase tracking-wider mb-3">CTA Clicks by Page</h4>
+                            <div className="bg-white rounded-2xl border border-stone-100 shadow-sm overflow-hidden">
+                              {ga4.landing.ctaClicks.map((c, i) => {
+                                const max = ga4.landing.ctaClicks[0].count || 1
+                                const pct = Math.round((c.count / max) * 100)
+                                return (
+                                  <div key={i} className="flex items-center gap-3 px-4 py-3 border-b border-stone-50 last:border-0">
+                                    <span className="text-sm text-stone-700 w-36 shrink-0 capitalize">{c.page} · {c.location}</span>
+                                    <div className="flex-1 bg-stone-100 rounded-full h-1.5">
+                                      <div className="bg-jade h-1.5 rounded-full" style={{ width: `${pct}%` }} />
+                                    </div>
+                                    <span className="text-xs text-stone-400 w-12 text-right tabular-nums">{c.count.toLocaleString()}</span>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
                     </div>
                   ) : loadingGa4 ? (
                     <div className="mt-8 flex items-center gap-2 text-stone-400">
