@@ -16,6 +16,9 @@ import {
   deleteAllEmptyGroupsAction,
   deleteAllOrphanedUsersAction,
   broadcastPushAction,
+  loadAnnouncementsAction,
+  publishAnnouncementAction,
+  deactivateAnnouncementAction,
 } from '@/actions/admin'
 import { logoutAction } from '@/actions/auth'
 
@@ -188,6 +191,11 @@ export default function DashboardClient({ initialGroups }) {
   const [loadingOrphans, setLoadingOrphans] = useState(false)
   const [showOrphans, setShowOrphans] = useState(false)
 
+  const [showBanner, setShowBanner] = useState(false)
+  const [announcements, setAnnouncements] = useState(null)
+  const [bannerDraft, setBannerDraft] = useState('')
+  const [bannerSending, setBannerSending] = useState(false)
+
   const [showGlobalSearch, setShowGlobalSearch] = useState(false)
   const [globalQuery, setGlobalQuery] = useState('')
   const [globalResults, setGlobalResults] = useState(null)
@@ -228,6 +236,7 @@ export default function DashboardClient({ initialGroups }) {
   async function selectGroup(group) {
     setShowOrphans(false)
     setShowGlobalSearch(false)
+    setShowBanner(false)
     setSelectedGroup(group)
     setSearch('')
     setGroupDetails(null)
@@ -249,6 +258,7 @@ export default function DashboardClient({ initialGroups }) {
     setMembers([])
     setSearch('')
     setShowGlobalSearch(false)
+    setShowBanner(false)
     setShowOrphans(true)
     if (orphanedUsers !== null) return
     setLoadingOrphans(true)
@@ -258,11 +268,44 @@ export default function DashboardClient({ initialGroups }) {
     setLoadingOrphans(false)
   }
 
+  async function handleSelectBanner() {
+    setSelectedGroup(null)
+    setMembers([])
+    setSearch('')
+    setShowGlobalSearch(false)
+    setShowOrphans(false)
+    setShowBanner(true)
+    if (announcements !== null) return
+    const { data, error } = await loadAnnouncementsAction()
+    if (error) showToast(error, 'error')
+    else setAnnouncements(data)
+  }
+
+  async function handlePublishBanner() {
+    if (!bannerDraft.trim()) return
+    setBannerSending(true)
+    const { error } = await publishAnnouncementAction(bannerDraft)
+    setBannerSending(false)
+    if (error) { showToast(error, 'error'); return }
+    setBannerDraft('')
+    const { data } = await loadAnnouncementsAction()
+    setAnnouncements(data)
+    showToast('Banner published')
+  }
+
+  async function handleDeactivateBanner(id) {
+    const { error } = await deactivateAnnouncementAction(id)
+    if (error) { showToast(error, 'error'); return }
+    setAnnouncements(prev => prev.map(a => a.id === id ? { ...a, active: false } : a))
+    showToast('Banner deactivated')
+  }
+
   function handleSelectGlobalSearch() {
     setSelectedGroup(null)
     setMembers([])
     setSearch('')
     setShowOrphans(false)
+    setShowBanner(false)
     setShowGlobalSearch(true)
     setGlobalResults(null)
     setGlobalQuery('')
@@ -573,6 +616,16 @@ export default function DashboardClient({ initialGroups }) {
                   )}
                 </div>
               </button>
+              <button
+                onClick={() => { setShowMenu(false); handleSelectBanner() }}
+                className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-left hover:bg-stone-800 transition-colors"
+              >
+                <span>📢</span>
+                <div>
+                  <p className="font-medium">In-App Banner</p>
+                  <p className="text-xs text-stone-400 mt-0.5">Send a message to all users</p>
+                </div>
+              </button>
               <Link
                 href="/audit"
                 onClick={() => setShowMenu(false)}
@@ -786,6 +839,73 @@ export default function DashboardClient({ initialGroups }) {
             </div>
           )}
 
+          {/* — In-App Banner — */}
+          {showBanner && (
+            <div className="max-w-2xl mx-auto">
+              <div className="mb-6">
+                <h2 className="text-base font-semibold text-stone-800">In-App Banner</h2>
+                <p className="text-xs text-stone-400 mt-1">Publishes a dismissible banner to all users the next time they open the app. Only one banner is active at a time.</p>
+              </div>
+
+              {/* Compose */}
+              <div className="bg-white rounded-2xl border border-stone-200 p-5 mb-6">
+                <label className="block text-xs font-semibold text-stone-500 uppercase tracking-wider mb-2">Message</label>
+                <textarea
+                  value={bannerDraft}
+                  onChange={e => setBannerDraft(e.target.value)}
+                  placeholder="e.g. Chat now loads instantly — open any conversation to try it!"
+                  rows={3}
+                  className="w-full text-sm text-stone-800 border border-stone-200 rounded-xl px-3 py-2.5 resize-none outline-none focus:border-jade transition-colors"
+                />
+                <div className="flex items-center justify-between mt-3">
+                  <span className="text-xs text-stone-400">{bannerDraft.trim().length}/200 characters</span>
+                  <button
+                    onClick={handlePublishBanner}
+                    disabled={!bannerDraft.trim() || bannerDraft.trim().length > 200 || bannerSending || isPending}
+                    className="px-4 py-2 text-sm font-semibold bg-jade text-white rounded-xl hover:bg-jade-700 transition-colors disabled:opacity-40"
+                  >
+                    {bannerSending ? 'Publishing…' : 'Publish Banner'}
+                  </button>
+                </div>
+              </div>
+
+              {/* History */}
+              <h3 className="text-xs font-semibold text-stone-500 uppercase tracking-wider mb-3">Recent Banners</h3>
+              {announcements === null ? (
+                <p className="text-sm text-stone-400 py-6 text-center">Loading…</p>
+              ) : announcements.length === 0 ? (
+                <div className="bg-white rounded-2xl border border-stone-100 py-10 text-center text-stone-400">
+                  <p className="text-sm">No banners sent yet</p>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-3">
+                  {announcements.map(a => (
+                    <div key={a.id} className="bg-white rounded-2xl border border-stone-200 px-5 py-4 flex items-start gap-4">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-stone-800 leading-snug">{a.message}</p>
+                        <p className="text-xs text-stone-400 mt-1">{formatTime(a.created_at)}</p>
+                      </div>
+                      {a.active ? (
+                        <div className="flex items-center gap-3 shrink-0">
+                          <span className="text-xs font-semibold text-jade bg-jade/10 px-2 py-1 rounded-full">Active</span>
+                          <button
+                            onClick={() => handleDeactivateBanner(a.id)}
+                            disabled={isPending}
+                            className="text-xs font-medium text-red-500 hover:text-red-700 transition-colors disabled:opacity-40"
+                          >
+                            Deactivate
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-stone-400 shrink-0">Inactive</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* — Global search — */}
           {showGlobalSearch && (
             <div className="max-w-6xl mx-auto">
@@ -868,21 +988,21 @@ export default function DashboardClient({ initialGroups }) {
           )}
 
           {/* — No selection — */}
-          {!showOrphans && !showGlobalSearch && !selectedGroup && (
+          {!showOrphans && !showGlobalSearch && !showBanner && !selectedGroup && (
             <div className="flex items-center justify-center h-full text-stone-400">
               <p className="text-sm">Select a group to view members</p>
             </div>
           )}
 
           {/* — Loading members — */}
-          {!showOrphans && !showGlobalSearch && selectedGroup && loadingMembers && (
+          {!showOrphans && !showGlobalSearch && !showBanner && selectedGroup && loadingMembers && (
             <div className="flex items-center justify-center h-full text-stone-400">
               <p className="text-sm">Loading…</p>
             </div>
           )}
 
           {/* — Group member view — */}
-          {!showOrphans && !showGlobalSearch && selectedGroup && !loadingMembers && (
+          {!showOrphans && !showGlobalSearch && !showBanner && selectedGroup && !loadingMembers && (
             <div className="max-w-6xl mx-auto">
               {/* Group header */}
               <div className="mb-4 space-y-2">

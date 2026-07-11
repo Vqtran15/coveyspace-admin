@@ -281,6 +281,37 @@ export async function deleteAllOrphanedUsersAction(orphanIds) {
   }
 }
 
+export async function loadAnnouncementsAction() {
+  await requireAuth()
+  const { data } = await getSupabase()
+    .from('announcements')
+    .select('id, message, active, created_at')
+    .order('created_at', { ascending: false })
+    .limit(10)
+  return { data: data ?? [] }
+}
+
+export async function publishAnnouncementAction(message) {
+  await requireAuth()
+  const ip = getIp()
+  const sb = getSupabase()
+  await sb.from('announcements').update({ active: false }).eq('active', true)
+  const { error } = await sb.from('announcements').insert({ message: message.trim() })
+  if (error) return { error: error.message }
+  await logAudit({ action: 'publish_announcement', targetType: 'all', targetLabel: message.slice(0, 80), ip })
+  return { success: true }
+}
+
+export async function deactivateAnnouncementAction(id) {
+  await requireAuth()
+  const ip = getIp()
+  const sb = getSupabase()
+  const { error } = await sb.from('announcements').update({ active: false }).eq('id', id)
+  if (error) return { error: error.message }
+  await logAudit({ action: 'deactivate_announcement', targetId: id, ip })
+  return { success: true }
+}
+
 export async function broadcastPushAction({ groupId, userIds, body }) {
   const title = 'Covey Space'
   await requireAuth()
