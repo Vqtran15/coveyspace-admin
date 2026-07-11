@@ -295,6 +295,7 @@ export async function loadMetricsAction() {
     { count: messages7d },
     { count: messages30d },
     { data: groupsWithMembers },
+    { data: convMsgData },
   ] = await Promise.all([
     sb.from('community_groups').select('*', { count: 'exact', head: true }),
     sb.from('profiles').select('*', { count: 'exact', head: true }),
@@ -303,12 +304,24 @@ export async function loadMetricsAction() {
     sb.from('messages').select('*', { count: 'exact', head: true }).gte('created_at', d7),
     sb.from('messages').select('*', { count: 'exact', head: true }).gte('created_at', d30),
     sb.from('community_groups').select('name, created_at, profiles(count)').order('created_at', { ascending: false }),
+    sb.from('conversations').select('community_group_id, community_groups(name), messages(count)'),
   ])
 
   const topGroups = (groupsWithMembers ?? [])
     .map(g => ({ name: g.name, members: g.profiles?.[0]?.count ?? 0, created_at: g.created_at }))
     .sort((a, b) => b.members - a.members)
     .slice(0, 8)
+
+  const groupMsgMap = {}
+  for (const conv of convMsgData ?? []) {
+    const name = conv.community_groups?.name
+    if (!name) continue
+    groupMsgMap[name] = (groupMsgMap[name] ?? 0) + (conv.messages?.[0]?.count ?? 0)
+  }
+  const messagesPerGroup = Object.entries(groupMsgMap)
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 10)
 
   return {
     data: {
@@ -319,6 +332,7 @@ export async function loadMetricsAction() {
       messages7d:  messages7d  ?? 0,
       messages30d: messages30d ?? 0,
       topGroups,
+      messagesPerGroup,
     }
   }
 }

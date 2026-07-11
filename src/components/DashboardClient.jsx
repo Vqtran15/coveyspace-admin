@@ -1069,37 +1069,72 @@ export default function DashboardClient({ initialGroups }) {
                     ))}
                   </div>
 
-                  {/* Top groups by size */}
-                  {metrics.topGroups.length > 0 && (
-                    <div>
-                      <h3 className="text-xs font-semibold text-stone-500 uppercase tracking-wider mb-3">Largest Groups</h3>
-                      <div className="bg-white rounded-2xl border border-stone-100 shadow-sm overflow-hidden">
-                        {metrics.topGroups.map((g, i) => {
-                          const max = metrics.topGroups[0].members || 1
-                          const pct = Math.round((g.members / max) * 100)
-                          return (
-                            <div
-                              key={i}
-                              className="flex items-center gap-4 px-5 py-3.5 border-b border-stone-50 last:border-0 cursor-pointer hover:bg-stone-50 transition-colors"
-                              onClick={() => {
-                                const match = groups.find(gr => gr.name === g.name)
-                                if (match) selectGroup(match)
-                              }}
-                            >
-                              <span className="text-xs text-stone-300 w-4 shrink-0 text-right">{i + 1}</span>
-                              <span className="text-sm font-medium text-stone-800 w-40 shrink-0 truncate">{g.name}</span>
-                              <div className="flex-1 bg-stone-100 rounded-full h-1.5">
-                                <div className="bg-jade h-1.5 rounded-full" style={{ width: `${pct}%` }} />
+                  {/* Two-column charts */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {/* Largest Groups */}
+                    {metrics.topGroups.length > 0 && (
+                      <div>
+                        <h3 className="text-xs font-semibold text-stone-500 uppercase tracking-wider mb-3">Largest Groups</h3>
+                        <div className="bg-white rounded-2xl border border-stone-100 shadow-sm overflow-hidden">
+                          {metrics.topGroups.map((g, i) => {
+                            const max = metrics.topGroups[0].members || 1
+                            const pct = Math.round((g.members / max) * 100)
+                            return (
+                              <div
+                                key={i}
+                                className="flex items-center gap-3 px-4 py-3 border-b border-stone-50 last:border-0 cursor-pointer hover:bg-stone-50 transition-colors"
+                                onClick={() => {
+                                  const match = groups.find(gr => gr.name === g.name)
+                                  if (match) selectGroup(match)
+                                }}
+                              >
+                                <span className="text-xs text-stone-300 w-4 shrink-0 text-right">{i + 1}</span>
+                                <span className="text-sm font-medium text-stone-800 w-32 shrink-0 truncate">{g.name}</span>
+                                <div className="flex-1 bg-stone-100 rounded-full h-1.5">
+                                  <div className="bg-jade h-1.5 rounded-full" style={{ width: `${pct}%` }} />
+                                </div>
+                                <span className="text-xs text-stone-400 shrink-0 w-16 text-right">
+                                  {g.members} member{g.members !== 1 ? 's' : ''}
+                                </span>
                               </div>
-                              <span className="text-xs text-stone-400 shrink-0 w-20 text-right">
-                                {g.members} member{g.members !== 1 ? 's' : ''}
-                              </span>
-                            </div>
-                          )
-                        })}
+                            )
+                          })}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
+
+                    {/* Messages per Group */}
+                    {metrics.messagesPerGroup.length > 0 && (
+                      <div>
+                        <h3 className="text-xs font-semibold text-stone-500 uppercase tracking-wider mb-3">Most Active Groups</h3>
+                        <div className="bg-white rounded-2xl border border-stone-100 shadow-sm overflow-hidden">
+                          {metrics.messagesPerGroup.map((g, i) => {
+                            const max = metrics.messagesPerGroup[0].count || 1
+                            const pct = Math.round((g.count / max) * 100)
+                            return (
+                              <div
+                                key={i}
+                                className="flex items-center gap-3 px-4 py-3 border-b border-stone-50 last:border-0 cursor-pointer hover:bg-stone-50 transition-colors"
+                                onClick={() => {
+                                  const match = groups.find(gr => gr.name === g.name)
+                                  if (match) selectGroup(match)
+                                }}
+                              >
+                                <span className="text-xs text-stone-300 w-4 shrink-0 text-right">{i + 1}</span>
+                                <span className="text-sm font-medium text-stone-800 w-32 shrink-0 truncate">{g.name}</span>
+                                <div className="flex-1 bg-stone-100 rounded-full h-1.5">
+                                  <div className="bg-amber-400 h-1.5 rounded-full" style={{ width: `${pct}%` }} />
+                                </div>
+                                <span className="text-xs text-stone-400 shrink-0 w-16 text-right">
+                                  {g.count.toLocaleString()} msg{g.count !== 1 ? 's' : ''}
+                                </span>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </>
               ) : null}
             </div>
