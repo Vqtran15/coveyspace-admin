@@ -311,13 +311,15 @@ export async function loadMetricsAction() {
     .slice(0, 8)
 
   return {
-    totalGroups:  totalGroups  ?? 0,
-    totalMembers: totalMembers ?? 0,
-    newGroups30d: newGroups30d ?? 0,
-    newMembers30d: newMembers30d ?? 0,
-    messages7d:  messages7d  ?? 0,
-    messages30d: messages30d ?? 0,
-    topGroups,
+    data: {
+      totalGroups:  totalGroups  ?? 0,
+      totalMembers: totalMembers ?? 0,
+      newGroups30d: newGroups30d ?? 0,
+      newMembers30d: newMembers30d ?? 0,
+      messages7d:  messages7d  ?? 0,
+      messages30d: messages30d ?? 0,
+      topGroups,
+    }
   }
 }
 
