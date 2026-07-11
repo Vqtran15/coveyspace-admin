@@ -1,7 +1,7 @@
 import './globals.css'
 
 export const metadata = {
-  title: 'Community Admin',
+  title: 'Covey Space Admin',
 }
 
 export default function RootLayout({ children }) {

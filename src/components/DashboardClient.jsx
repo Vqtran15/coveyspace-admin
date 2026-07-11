@@ -19,6 +19,7 @@ import {
   loadAnnouncementsAction,
   publishAnnouncementAction,
   deactivateAnnouncementAction,
+  loadMetricsAction,
 } from '@/actions/admin'
 import { logoutAction } from '@/actions/auth'
 
@@ -191,6 +192,10 @@ export default function DashboardClient({ initialGroups }) {
   const [loadingOrphans, setLoadingOrphans] = useState(false)
   const [showOrphans, setShowOrphans] = useState(false)
 
+  const [metrics, setMetrics]           = useState(null)
+  const [loadingMetrics, setLoadingMetrics] = useState(false)
+  const [showMetrics, setShowMetrics]   = useState(true)
+
   const [showBanner, setShowBanner] = useState(false)
   const [announcements, setAnnouncements] = useState(null)
   const [bannerDraft, setBannerDraft] = useState('')
@@ -237,6 +242,7 @@ export default function DashboardClient({ initialGroups }) {
     setShowOrphans(false)
     setShowGlobalSearch(false)
     setShowBanner(false)
+    setShowMetrics(false)
     setSelectedGroup(group)
     setSearch('')
     setGroupDetails(null)
@@ -253,12 +259,29 @@ export default function DashboardClient({ initialGroups }) {
     setLoadingMembers(false)
   }
 
+  async function handleSelectHome() {
+    setSelectedGroup(null)
+    setMembers([])
+    setSearch('')
+    setShowGlobalSearch(false)
+    setShowOrphans(false)
+    setShowBanner(false)
+    setShowMetrics(true)
+    if (metrics) return
+    setLoadingMetrics(true)
+    const { data, error } = await loadMetricsAction()
+    if (error) showToast(error, 'error')
+    else setMetrics(data)
+    setLoadingMetrics(false)
+  }
+
   async function handleSelectOrphans() {
     setSelectedGroup(null)
     setMembers([])
     setSearch('')
     setShowGlobalSearch(false)
     setShowBanner(false)
+    setShowMetrics(false)
     setShowOrphans(true)
     if (orphanedUsers !== null) return
     setLoadingOrphans(true)
@@ -274,6 +297,7 @@ export default function DashboardClient({ initialGroups }) {
     setSearch('')
     setShowGlobalSearch(false)
     setShowOrphans(false)
+    setShowMetrics(false)
     setShowBanner(true)
     if (announcements !== null) return
     const { data, error } = await loadAnnouncementsAction()
@@ -306,6 +330,7 @@ export default function DashboardClient({ initialGroups }) {
     setSearch('')
     setShowOrphans(false)
     setShowBanner(false)
+    setShowMetrics(false)
     setShowGlobalSearch(true)
     setGlobalResults(null)
     setGlobalQuery('')
@@ -419,6 +444,10 @@ export default function DashboardClient({ initialGroups }) {
     setEditingGroupHeader(false)
     setRenaming(false)
   }
+
+  useEffect(() => {
+    handleSelectHome()
+  }, [])
 
   // Stats
   const totalMembers = groups.reduce((s, g) => s + (g.member_count || 0), 0)
@@ -593,6 +622,16 @@ export default function DashboardClient({ initialGroups }) {
             </div>
             <div className="flex flex-col p-4 gap-1">
               <button
+                onClick={() => { setShowMenu(false); handleSelectHome() }}
+                className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-left hover:bg-stone-800 transition-colors"
+              >
+                <span>🏠</span>
+                <div>
+                  <p className="font-medium">Overview</p>
+                  <p className="text-xs text-stone-400 mt-0.5">Metrics and activity</p>
+                </div>
+              </button>
+              <button
                 onClick={() => { setShowMenu(false); setBroadcastGroupName(''); setBroadcastTarget('all') }}
                 className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-left hover:bg-stone-800 transition-colors"
               >
@@ -652,13 +691,13 @@ export default function DashboardClient({ initialGroups }) {
 
       {/* Header */}
       <header className="bg-stone-900 text-white px-6 py-4 flex items-center justify-between shrink-0">
-        <div>
-          <h1 className="text-lg font-bold tracking-tight">Community Admin</h1>
+        <button onClick={handleSelectHome} className="text-left hover:opacity-80 transition-opacity">
+          <h1 className="text-lg font-bold tracking-tight">Covey Space Admin</h1>
           <p className="text-xs text-stone-400 mt-0.5">
             {groups.length} groups · {totalMembers} members
             {emptyGroups > 0 && ` · ${emptyGroups} empty`}
           </p>
-        </div>
+        </button>
         <div className="flex items-center gap-1">
           <button
             onClick={handleSelectGlobalSearch}
@@ -987,10 +1026,82 @@ export default function DashboardClient({ initialGroups }) {
             </div>
           )}
 
-          {/* — No selection — */}
-          {!showOrphans && !showGlobalSearch && !showBanner && !selectedGroup && (
-            <div className="flex items-center justify-center h-full text-stone-400">
-              <p className="text-sm">Select a group to view members</p>
+          {/* — Overview / Metrics — */}
+          {showMetrics && !showOrphans && !showGlobalSearch && !showBanner && !selectedGroup && (
+            <div className="max-w-4xl mx-auto">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-base font-semibold text-stone-800">Overview</h2>
+                <button
+                  onClick={async () => {
+                    setLoadingMetrics(true)
+                    const { data } = await loadMetricsAction()
+                    if (data) setMetrics(data)
+                    setLoadingMetrics(false)
+                  }}
+                  disabled={loadingMetrics}
+                  className="text-xs text-stone-400 hover:text-stone-600 transition-colors disabled:opacity-40"
+                >
+                  {loadingMetrics ? 'Refreshing…' : 'Refresh'}
+                </button>
+              </div>
+
+              {loadingMetrics && !metrics ? (
+                <div className="flex items-center justify-center py-24 text-stone-400">
+                  <p className="text-sm">Loading…</p>
+                </div>
+              ) : metrics ? (
+                <>
+                  {/* Scorecard grid */}
+                  <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+                    {[
+                      { label: 'Total Groups',    value: metrics.totalGroups,   sub: null },
+                      { label: 'Total Members',   value: metrics.totalMembers,  sub: null },
+                      { label: 'Messages (7d)',   value: metrics.messages7d.toLocaleString(),  sub: 'last 7 days' },
+                      { label: 'Messages (30d)',  value: metrics.messages30d.toLocaleString(), sub: 'last 30 days' },
+                      { label: 'New Groups',      value: `+${metrics.newGroups30d}`,  sub: 'last 30 days' },
+                      { label: 'New Members',     value: `+${metrics.newMembers30d}`, sub: 'last 30 days' },
+                    ].map(({ label, value, sub }) => (
+                      <div key={label} className="bg-white rounded-2xl border border-stone-100 px-5 py-4 shadow-sm">
+                        <p className="text-xs font-semibold text-stone-400 uppercase tracking-wider mb-1">{label}</p>
+                        <p className="text-3xl font-bold text-stone-800">{value}</p>
+                        {sub && <p className="text-xs text-stone-400 mt-0.5">{sub}</p>}
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Top groups by size */}
+                  {metrics.topGroups.length > 0 && (
+                    <div>
+                      <h3 className="text-xs font-semibold text-stone-500 uppercase tracking-wider mb-3">Largest Groups</h3>
+                      <div className="bg-white rounded-2xl border border-stone-100 shadow-sm overflow-hidden">
+                        {metrics.topGroups.map((g, i) => {
+                          const max = metrics.topGroups[0].members || 1
+                          const pct = Math.round((g.members / max) * 100)
+                          return (
+                            <div
+                              key={i}
+                              className="flex items-center gap-4 px-5 py-3.5 border-b border-stone-50 last:border-0 cursor-pointer hover:bg-stone-50 transition-colors"
+                              onClick={() => {
+                                const match = groups.find(gr => gr.name === g.name)
+                                if (match) selectGroup(match)
+                              }}
+                            >
+                              <span className="text-xs text-stone-300 w-4 shrink-0 text-right">{i + 1}</span>
+                              <span className="text-sm font-medium text-stone-800 w-40 shrink-0 truncate">{g.name}</span>
+                              <div className="flex-1 bg-stone-100 rounded-full h-1.5">
+                                <div className="bg-jade h-1.5 rounded-full" style={{ width: `${pct}%` }} />
+                              </div>
+                              <span className="text-xs text-stone-400 shrink-0 w-20 text-right">
+                                {g.members} member{g.members !== 1 ? 's' : ''}
+                              </span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : null}
             </div>
           )}
 

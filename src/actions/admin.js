@@ -281,6 +281,46 @@ export async function deleteAllOrphanedUsersAction(orphanIds) {
   }
 }
 
+export async function loadMetricsAction() {
+  await requireAuth()
+  const sb = getSupabase()
+  const d7  = new Date(Date.now() - 7  * 86400000).toISOString()
+  const d30 = new Date(Date.now() - 30 * 86400000).toISOString()
+
+  const [
+    { count: totalGroups },
+    { count: totalMembers },
+    { count: newGroups30d },
+    { count: newMembers30d },
+    { count: messages7d },
+    { count: messages30d },
+    { data: groupsWithMembers },
+  ] = await Promise.all([
+    sb.from('community_groups').select('*', { count: 'exact', head: true }),
+    sb.from('profiles').select('*', { count: 'exact', head: true }),
+    sb.from('community_groups').select('*', { count: 'exact', head: true }).gte('created_at', d30),
+    sb.from('profiles').select('*', { count: 'exact', head: true }).gte('created_at', d30),
+    sb.from('messages').select('*', { count: 'exact', head: true }).gte('created_at', d7),
+    sb.from('messages').select('*', { count: 'exact', head: true }).gte('created_at', d30),
+    sb.from('community_groups').select('name, created_at, profiles(count)').order('created_at', { ascending: false }),
+  ])
+
+  const topGroups = (groupsWithMembers ?? [])
+    .map(g => ({ name: g.name, members: g.profiles?.[0]?.count ?? 0, created_at: g.created_at }))
+    .sort((a, b) => b.members - a.members)
+    .slice(0, 8)
+
+  return {
+    totalGroups:  totalGroups  ?? 0,
+    totalMembers: totalMembers ?? 0,
+    newGroups30d: newGroups30d ?? 0,
+    newMembers30d: newMembers30d ?? 0,
+    messages7d:  messages7d  ?? 0,
+    messages30d: messages30d ?? 0,
+    topGroups,
+  }
+}
+
 export async function loadAnnouncementsAction() {
   await requireAuth()
   const { data } = await getSupabase()
