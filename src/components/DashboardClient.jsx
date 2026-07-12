@@ -4,6 +4,7 @@ import { useState, useEffect, useTransition, useMemo, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { UsersThree, Megaphone } from '@phosphor-icons/react'
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip } from 'recharts'
 import Link from 'next/link'
 import {
   loadMembers,
@@ -30,6 +31,40 @@ import AdminNav from '@/components/AdminNav'
 import { loadGA4MetricsAction } from '@/actions/analytics'
 
 const PT = 'America/Los_Angeles'
+
+function DailyUsersChart({ data, id, color }) {
+  if (!data?.length) return null
+  return (
+    <div className="bg-white rounded-2xl border border-stone-100 shadow-sm p-5">
+      <h4 className="text-xs font-semibold text-stone-500 uppercase tracking-wider mb-4">Daily Active Users</h4>
+      <ResponsiveContainer width="100%" height={160}>
+        <AreaChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
+          <defs>
+            <linearGradient id={`dau-grad-${id}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor={color} stopOpacity={0.15} />
+              <stop offset="95%" stopColor={color} stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          <XAxis
+            dataKey="date"
+            tick={{ fontSize: 10, fill: '#a8a29e' }}
+            tickLine={false}
+            axisLine={false}
+            tickFormatter={d => { const [, m, day] = d.split('-'); return `${parseInt(m)}/${parseInt(day)}` }}
+            interval="preserveStartEnd"
+          />
+          <YAxis tick={{ fontSize: 10, fill: '#a8a29e' }} tickLine={false} axisLine={false} width={32} />
+          <Tooltip
+            contentStyle={{ fontSize: '12px', borderRadius: '12px', border: '1px solid #e7e5e4', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}
+            labelFormatter={d => { const [y, m, day] = d.split('-'); return new Date(+y, +m - 1, +day).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) }}
+            formatter={v => [v.toLocaleString(), 'Users']}
+          />
+          <Area type="monotone" dataKey="count" stroke={color} strokeWidth={2} fill={`url(#dau-grad-${id})`} dot={false} activeDot={{ r: 4 }} />
+        </AreaChart>
+      </ResponsiveContainer>
+    </div>
+  )
+}
 
 function formatTime(iso) {
   if (!iso) return '—'
@@ -1292,6 +1327,8 @@ export default function DashboardClient({ initialGroups }) {
                             ))}
                           </div>
 
+                          <DailyUsersChart data={ga4.app.dailyUsers} id="app" color="#6366f1" />
+
                           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                             <div>
                               <h4 className="text-xs font-semibold text-stone-500 uppercase tracking-wider mb-3">Feature Events</h4>
@@ -1410,8 +1447,17 @@ export default function DashboardClient({ initialGroups }) {
                       {/* ── www.coveyspace.com ── */}
                       {analyticsHost === 'landing' && (() => {
                         const { label: periodLabel } = getQueryDates()
+                        const ctaTotal = ga4.landing.ctaClicks.reduce((s, c) => s + c.count, 0)
+                        const { ctaTotalSimple } = ga4.landing
+                        const ctaDisplayValue = ctaTotal > 0 ? ctaTotal : ctaTotalSimple
+                        const ctaNote = ctaTotal > 0
+                          ? null
+                          : ctaTotalSimple > 0
+                          ? 'Event fires — custom params not registered in GA4'
+                          : 'No cta_click events found'
                         return (
                         <div className={`space-y-6 transition-opacity duration-200 ${loadingGa4 ? 'opacity-40 pointer-events-none' : ''}`}>
+                          {/* Scorecards */}
                           <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
                             <div className="bg-white rounded-2xl border border-stone-100 px-5 py-4 shadow-sm">
                               <p className="text-xs font-semibold text-stone-400 uppercase tracking-wider mb-1">Active Users</p>
@@ -1420,55 +1466,112 @@ export default function DashboardClient({ initialGroups }) {
                             </div>
                             <div className="bg-white rounded-2xl border border-stone-100 px-5 py-4 shadow-sm">
                               <p className="text-xs font-semibold text-stone-400 uppercase tracking-wider mb-1">CTA Clicks</p>
-                              <p className="text-3xl font-bold text-stone-800">{ga4.landing.ctaClicks.reduce((s, c) => s + c.count, 0).toLocaleString()}</p>
-                              <p className="text-xs text-stone-400 mt-0.5">{periodLabel}</p>
+                              <p className={`text-3xl font-bold ${ctaDisplayValue === 0 ? 'text-stone-300' : 'text-stone-800'}`}>
+                                {ctaDisplayValue.toLocaleString()}
+                              </p>
+                              {ctaNote
+                                ? <p className="text-xs text-amber-500 mt-0.5">{ctaNote}</p>
+                                : <p className="text-xs text-stone-400 mt-0.5">{periodLabel}</p>
+                              }
                             </div>
                           </div>
 
-                          {/* CTA by Page + CTA by Location */}
-                          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                            {ga4.landing.ctaByPage.length > 0 && (
-                              <div>
-                                <h4 className="text-xs font-semibold text-stone-500 uppercase tracking-wider mb-3">CTA Clicks by Page</h4>
-                                <div className="bg-white rounded-2xl border border-stone-100 shadow-sm overflow-hidden">
-                                  {ga4.landing.ctaByPage.map((c, i) => {
-                                    const max = ga4.landing.ctaByPage[0].count || 1
-                                    const pct = Math.round((c.count / max) * 100)
-                                    return (
-                                      <div key={i} className="flex items-center gap-3 px-4 py-3 border-b border-stone-50 last:border-0">
-                                        <span className="text-sm text-stone-700 w-24 shrink-0 capitalize">{c.name}</span>
-                                        <div className="flex-1 bg-stone-100 rounded-full h-1.5">
-                                          <div className="bg-jade h-1.5 rounded-full" style={{ width: `${pct}%` }} />
-                                        </div>
-                                        <span className="text-xs text-stone-400 w-10 text-right tabular-nums">{c.count.toLocaleString()}</span>
-                                      </div>
-                                    )
-                                  })}
-                                </div>
-                              </div>
-                            )}
+                          {/* Daily Users Chart */}
+                          <DailyUsersChart data={ga4.landing.dailyUsers} id="land" color="#10b981" />
 
-                            {ga4.landing.ctaByLocation.length > 0 && (
-                              <div>
-                                <h4 className="text-xs font-semibold text-stone-500 uppercase tracking-wider mb-3">CTA Clicks by Location</h4>
-                                <div className="bg-white rounded-2xl border border-stone-100 shadow-sm overflow-hidden">
-                                  {ga4.landing.ctaByLocation.map((c, i) => {
-                                    const max = ga4.landing.ctaByLocation[0].count || 1
-                                    const pct = Math.round((c.count / max) * 100)
-                                    return (
-                                      <div key={i} className="flex items-center gap-3 px-4 py-3 border-b border-stone-50 last:border-0">
-                                        <span className="text-sm text-stone-700 w-24 shrink-0 capitalize">{c.name}</span>
-                                        <div className="flex-1 bg-stone-100 rounded-full h-1.5">
-                                          <div className="bg-emerald-400 h-1.5 rounded-full" style={{ width: `${pct}%` }} />
-                                        </div>
-                                        <span className="text-xs text-stone-400 w-10 text-right tabular-nums">{c.count.toLocaleString()}</span>
+                          {/* Marketing Channels */}
+                          {ga4.landing.channels.length > 0 && (
+                            <div>
+                              <h4 className="text-xs font-semibold text-stone-500 uppercase tracking-wider mb-3">Traffic by Channel</h4>
+                              <div className="bg-white rounded-2xl border border-stone-100 shadow-sm overflow-hidden">
+                                {ga4.landing.channels.map((ch, i) => {
+                                  const max = ga4.landing.channels[0].count || 1
+                                  const pct = Math.round((ch.count / max) * 100)
+                                  return (
+                                    <div key={i} className="flex items-center gap-3 px-4 py-3 border-b border-stone-50 last:border-0">
+                                      <span className="text-sm text-stone-700 w-36 shrink-0">{ch.name}</span>
+                                      <div className="flex-1 bg-stone-100 rounded-full h-1.5">
+                                        <div className="bg-violet-400 h-1.5 rounded-full" style={{ width: `${pct}%` }} />
                                       </div>
-                                    )
-                                  })}
-                                </div>
+                                      <span className="text-xs text-stone-400 w-12 text-right tabular-nums">{ch.count.toLocaleString()}</span>
+                                    </div>
+                                  )
+                                })}
                               </div>
-                            )}
-                          </div>
+                            </div>
+                          )}
+
+                          {/* CTA by Page + CTA by Location */}
+                          {(ga4.landing.ctaByPage.length > 0 || ga4.landing.ctaByLocation.length > 0) && (
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                              {ga4.landing.ctaByPage.length > 0 && (
+                                <div>
+                                  <h4 className="text-xs font-semibold text-stone-500 uppercase tracking-wider mb-3">CTA Clicks by Page</h4>
+                                  <div className="bg-white rounded-2xl border border-stone-100 shadow-sm overflow-hidden">
+                                    {ga4.landing.ctaByPage.map((c, i) => {
+                                      const max = ga4.landing.ctaByPage[0].count || 1
+                                      const pct = Math.round((c.count / max) * 100)
+                                      return (
+                                        <div key={i} className="flex items-center gap-3 px-4 py-3 border-b border-stone-50 last:border-0">
+                                          <span className="text-sm text-stone-700 w-24 shrink-0 capitalize">{c.name}</span>
+                                          <div className="flex-1 bg-stone-100 rounded-full h-1.5">
+                                            <div className="bg-jade h-1.5 rounded-full" style={{ width: `${pct}%` }} />
+                                          </div>
+                                          <span className="text-xs text-stone-400 w-10 text-right tabular-nums">{c.count.toLocaleString()}</span>
+                                        </div>
+                                      )
+                                    })}
+                                  </div>
+                                </div>
+                              )}
+                              {ga4.landing.ctaByLocation.length > 0 && (
+                                <div>
+                                  <h4 className="text-xs font-semibold text-stone-500 uppercase tracking-wider mb-3">CTA Clicks by Location</h4>
+                                  <div className="bg-white rounded-2xl border border-stone-100 shadow-sm overflow-hidden">
+                                    {ga4.landing.ctaByLocation.map((c, i) => {
+                                      const max = ga4.landing.ctaByLocation[0].count || 1
+                                      const pct = Math.round((c.count / max) * 100)
+                                      return (
+                                        <div key={i} className="flex items-center gap-3 px-4 py-3 border-b border-stone-50 last:border-0">
+                                          <span className="text-sm text-stone-700 w-24 shrink-0 capitalize">{c.name}</span>
+                                          <div className="flex-1 bg-stone-100 rounded-full h-1.5">
+                                            <div className="bg-emerald-400 h-1.5 rounded-full" style={{ width: `${pct}%` }} />
+                                          </div>
+                                          <span className="text-xs text-stone-400 w-10 text-right tabular-nums">{c.count.toLocaleString()}</span>
+                                        </div>
+                                      )
+                                    })}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* All Landing Events — diagnostic; highlights anything CTA-related */}
+                          {ga4.landing.allEvents.length > 0 && (
+                            <div>
+                              <h4 className="text-xs font-semibold text-stone-500 uppercase tracking-wider mb-3">
+                                All Landing Events
+                                {ctaTotal === 0 && <span className="ml-2 normal-case font-normal text-amber-500">— look for cta_click below</span>}
+                              </h4>
+                              <div className="bg-white rounded-2xl border border-stone-100 shadow-sm overflow-hidden">
+                                {ga4.landing.allEvents.map((ev, i) => {
+                                  const max = ga4.landing.allEvents[0].count || 1
+                                  const pct = Math.round((ev.count / max) * 100)
+                                  const highlight = ev.name.toLowerCase().includes('cta') || ev.name.toLowerCase().includes('click')
+                                  return (
+                                    <div key={i} className={`flex items-center gap-3 px-4 py-3 border-b border-stone-50 last:border-0 ${highlight ? 'bg-amber-50' : ''}`}>
+                                      <span className={`text-sm w-52 shrink-0 font-mono text-xs ${highlight ? 'text-amber-700 font-semibold' : 'text-stone-600'}`}>{ev.name}</span>
+                                      <div className="flex-1 bg-stone-100 rounded-full h-1.5">
+                                        <div className={`h-1.5 rounded-full ${highlight ? 'bg-amber-400' : 'bg-stone-300'}`} style={{ width: `${pct}%` }} />
+                                      </div>
+                                      <span className="text-xs text-stone-400 w-12 text-right tabular-nums">{ev.count.toLocaleString()}</span>
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                          )}
 
                           {/* Country + City */}
                           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -1492,7 +1595,6 @@ export default function DashboardClient({ initialGroups }) {
                                 </div>
                               </div>
                             )}
-
                             {ga4.landing.cities.length > 0 && (
                               <div>
                                 <h4 className="text-xs font-semibold text-stone-500 uppercase tracking-wider mb-3">Users by City</h4>
