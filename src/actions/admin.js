@@ -70,6 +70,7 @@ export async function deleteGroupAction(groupId, groupName) {
       sb.from('signups').delete().eq('community_group_id', groupId),
       sb.from('serving_signups').delete().eq('community_group_id', groupId),
       sb.from('birthdays').delete().eq('community_group_id', groupId),
+      sb.from('prayer_requests').delete().eq('community_group_id', groupId),
     ])
     await Promise.all([
       sb.from('meal_pages').delete().eq('community_group_id', groupId),
@@ -444,7 +445,7 @@ export async function loadGroupMessagesAction(groupId, { limit = 50, offset = 0 
   await requireAuth()
   const { data, error } = await getSupabase()
     .from('messages')
-    .select('id, content, user_id, created_at, profiles(display_name)')
+    .select('id, body, display_name, image_url, created_at')
     .eq('community_group_id', groupId)
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1)
@@ -456,17 +457,36 @@ export async function loadGroupActivityAction(groupId) {
   await requireAuth()
   const sb = getSupabase()
   const [mealsRes, servicesRes, birthdaysRes, prayerRes] = await Promise.all([
-    sb.from('meal_pages').select('*').eq('community_group_id', groupId).order('created_at', { ascending: false }).limit(50),
-    sb.from('serving_pages').select('*').eq('community_group_id', groupId).order('created_at', { ascending: false }).limit(50),
-    sb.from('birthdays').select('*').eq('community_group_id', groupId).order('created_at', { ascending: false }).limit(50),
-    sb.from('prayer_requests').select('*, profiles(display_name)').eq('community_group_id', groupId).order('created_at', { ascending: false }).limit(50),
+    sb.from('meal_pages')
+      .select('id, title, week_date, slot_dishes, slot_count, is_paused, created_at')
+      .eq('community_group_id', groupId)
+      .eq('is_sample', false)
+      .order('week_date', { ascending: false })
+      .limit(50),
+    sb.from('serving_pages')
+      .select('id, title, week_date, slot_dishes, slot_count, is_paused, created_at')
+      .eq('community_group_id', groupId)
+      .eq('is_sample', false)
+      .order('week_date', { ascending: false })
+      .limit(50),
+    sb.from('birthdays')
+      .select('id, name, birthday, created_at')
+      .eq('community_group_id', groupId)
+      .eq('is_sample', false)
+      .order('birthday')
+      .limit(100),
+    sb.from('prayer_requests')
+      .select('id, added_by, request, date, created_at')
+      .eq('community_group_id', groupId)
+      .order('created_at', { ascending: false })
+      .limit(50),
   ])
   return {
     data: {
-      meals:    mealsRes.data    ?? [],
-      services: servicesRes.data ?? [],
+      meals:     mealsRes.data    ?? [],
+      services:  servicesRes.data ?? [],
       birthdays: birthdaysRes.data ?? [],
-      prayers:  prayerRes.error ? [] : (prayerRes.data ?? []),
+      prayers:   prayerRes.error ? [] : (prayerRes.data ?? []),
       prayerError: prayerRes.error?.message ?? null,
     },
   }

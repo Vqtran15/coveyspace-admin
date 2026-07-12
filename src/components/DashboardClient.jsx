@@ -197,7 +197,10 @@ function ActivityList({ items, empty, renderRow }) {
                 {body && <p className="text-sm text-stone-600 mt-1 leading-snug">{body}</p>}
               </div>
               <span className="text-xs text-stone-400 whitespace-nowrap shrink-0 mt-0.5">{
-                date ? new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'
+                date
+                  ? new Date(date.length === 10 ? date + 'T12:00:00' : date)
+                      .toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                  : '—'
               }</span>
             </div>
           </div>
@@ -1856,17 +1859,20 @@ export default function DashboardClient({ initialGroups }) {
                           <div key={msg.id ?? i} className="px-5 py-3 flex gap-3">
                             <div className="w-7 h-7 rounded-full bg-stone-100 flex items-center justify-center shrink-0 mt-0.5">
                               <span className="text-xs font-semibold text-stone-500">
-                                {(msg.profiles?.display_name || '?').charAt(0).toUpperCase()}
+                                {(msg.display_name || '?').charAt(0).toUpperCase()}
                               </span>
                             </div>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-baseline gap-2 mb-0.5">
                                 <span className="text-xs font-semibold text-stone-700">
-                                  {msg.profiles?.display_name || 'Unknown'}
+                                  {msg.display_name || 'Unknown'}
                                 </span>
                                 <span className="text-xs text-stone-400">{formatTime(msg.created_at)}</span>
                               </div>
-                              <p className="text-sm text-stone-700 break-words leading-snug">{msg.content}</p>
+                              {msg.body && <p className="text-sm text-stone-700 break-words leading-snug">{msg.body}</p>}
+                              {msg.image_url && (
+                                <img src={msg.image_url} alt="" className="mt-1.5 max-w-[200px] rounded-lg border border-stone-100" />
+                              )}
                             </div>
                           </div>
                         ))}
@@ -1920,10 +1926,14 @@ export default function DashboardClient({ initialGroups }) {
                           items={groupActivity.meals}
                           empty="No meals recorded"
                           renderRow={row => ({
-                            title: row.title ?? row.name ?? row.meal_name ?? '(untitled)',
-                            subtitle: [row.date ?? row.meal_date, row.location].filter(Boolean).join(' · '),
-                            body: row.description ?? row.notes ?? null,
-                            date: row.created_at,
+                            title: row.title ?? '(untitled)',
+                            subtitle: row.week_date
+                              ? `Week of ${new Date(row.week_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}${row.is_paused ? ' · Paused' : ''}`
+                              : null,
+                            body: Array.isArray(row.slot_dishes) && row.slot_dishes.filter(Boolean).length > 0
+                              ? row.slot_dishes.filter(Boolean).join(' · ')
+                              : null,
+                            date: row.week_date ?? row.created_at,
                           })}
                         />
                       )}
@@ -1934,10 +1944,14 @@ export default function DashboardClient({ initialGroups }) {
                           items={groupActivity.services}
                           empty="No services recorded"
                           renderRow={row => ({
-                            title: row.title ?? row.name ?? row.service_name ?? '(untitled)',
-                            subtitle: [row.date ?? row.service_date, row.location].filter(Boolean).join(' · '),
-                            body: row.description ?? row.notes ?? null,
-                            date: row.created_at,
+                            title: row.title ?? '(untitled)',
+                            subtitle: row.week_date
+                              ? `Week of ${new Date(row.week_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}${row.is_paused ? ' · Paused' : ''}`
+                              : null,
+                            body: Array.isArray(row.slot_dishes) && row.slot_dishes.filter(Boolean).length > 0
+                              ? row.slot_dishes.filter(Boolean).join(' · ')
+                              : null,
+                            date: row.week_date ?? row.created_at,
                           })}
                         />
                       )}
@@ -1948,10 +1962,12 @@ export default function DashboardClient({ initialGroups }) {
                           items={groupActivity.birthdays}
                           empty="No birthdays recorded"
                           renderRow={row => ({
-                            title: row.name ?? row.person_name ?? row.display_name ?? '(untitled)',
-                            subtitle: row.date ?? row.birthday ?? row.birthday_date ?? null,
+                            title: row.name ?? '(unknown)',
+                            subtitle: row.birthday
+                              ? new Date(row.birthday + 'T12:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric' })
+                              : null,
                             body: null,
-                            date: row.created_at,
+                            date: row.birthday ?? row.created_at,
                           })}
                         />
                       )}
@@ -1968,9 +1984,11 @@ export default function DashboardClient({ initialGroups }) {
                             items={groupActivity.prayers}
                             empty="No prayer requests"
                             renderRow={row => ({
-                              title: row.profiles?.display_name ?? row.author ?? 'Unknown',
-                              subtitle: null,
-                              body: row.content ?? row.body ?? row.text ?? row.request ?? null,
+                              title: row.added_by ?? 'Unknown',
+                              subtitle: row.date
+                                ? new Date(row.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                                : null,
+                              body: row.request ?? null,
                               date: row.created_at,
                             })}
                           />
