@@ -1334,11 +1334,12 @@ export default function DashboardClient({ initialGroups }) {
                               <h4 className="text-xs font-semibold text-stone-500 uppercase tracking-wider mb-3">Feature Events</h4>
                               <div className="bg-white rounded-2xl border border-stone-100 shadow-sm overflow-hidden">
                                 {[
-                                  { label: 'Chat Messages', value: ga4.app.chatMessages30d },
-                                  { label: 'Event RSVPs',   value: ga4.app.eventRsvps30d },
-                                  { label: 'Push Opt-ins',  value: ga4.app.pushOptIns30d },
+                                  { label: 'Chat Messages',     value: ga4.app.chatMessages30d },
+                                  { label: 'Prayer Requests',   value: ga4.app.prayerRequests30d },
+                                  { label: 'Schedule Sign-ups', value: ga4.app.scheduleSignups30d },
+                                  { label: 'Push Opt-ins',      value: ga4.app.pushOptIns30d },
                                 ].map(({ label, value }) => {
-                                  const max = Math.max(ga4.app.chatMessages30d, ga4.app.eventRsvps30d, ga4.app.pushOptIns30d, 1)
+                                  const max = Math.max(ga4.app.chatMessages30d, ga4.app.prayerRequests30d, ga4.app.scheduleSignups30d, ga4.app.pushOptIns30d, 1)
                                   const pct = Math.round((value / max) * 100)
                                   return (
                                     <div key={label} className="flex items-center gap-3 px-4 py-3 border-b border-stone-50 last:border-0">

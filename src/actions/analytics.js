@@ -65,7 +65,7 @@ export async function loadGA4MetricsAction({ ga4Start = '30daysAgo', ga4End = 't
         metrics: [{ name: 'eventCount' }],
         dimensionFilter: andFilter(
           hostFilter(APP),
-          { filter: { fieldName: 'eventName', inListFilter: { values: ['sign_up', 'login', 'chat_message_sent', 'event_rsvp', 'push_notifications_enabled'] } } }
+          { filter: { fieldName: 'eventName', inListFilter: { values: ['sign_up', 'login', 'chat_message_sent', 'prayer_request_added', 'schedule_signup', 'push_notifications_enabled'] } } }
         ),
       }),
       // App: active users 7d
@@ -267,7 +267,8 @@ export async function loadGA4MetricsAction({ ga4Start = '30daysAgo', ga4End = 't
           signups30d:         appEventMap['sign_up']                    ?? 0,
           logins30d:          appEventMap['login']                      ?? 0,
           chatMessages30d:    appEventMap['chat_message_sent']          ?? 0,
-          eventRsvps30d:      appEventMap['event_rsvp']                 ?? 0,
+          prayerRequests30d:  appEventMap['prayer_request_added']       ?? 0,
+          scheduleSignups30d: appEventMap['schedule_signup']            ?? 0,
           pushOptIns30d:      appEventMap['push_notifications_enabled'] ?? 0,
           tabs,
           signupMethods,
