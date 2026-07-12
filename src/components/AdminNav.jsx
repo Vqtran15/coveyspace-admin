@@ -50,7 +50,6 @@ export default function AdminNav({
   onGroups,
   onOrphans,
   onBanner,
-  onBroadcast,
   orphanCount = 0,
   activeView = 'overview',
 }) {
@@ -72,6 +71,7 @@ export default function AdminNav({
   function isActive(view) {
     if (view === 'audit') return pathname === '/audit'
     if (view === 'errors') return pathname === '/errors'
+    if (view === 'broadcast') return pathname === '/broadcast'
     return pathname === '/dashboard' && activeView === view
   }
 
@@ -113,7 +113,7 @@ export default function AdminNav({
         />
         <NavItem
           onClick={onGroups}
-          href="/dashboard"
+          href="/dashboard?view=groups"
           icon={UsersThree}
           label="Groups"
           sublabel="Manage communities"
@@ -122,7 +122,7 @@ export default function AdminNav({
         />
         <NavItem
           onClick={onOrphans}
-          href="/dashboard"
+          href="/dashboard?view=orphans"
           icon={Ghost}
           label="Orphaned Users"
           active={isActive('orphans')}
@@ -131,11 +131,19 @@ export default function AdminNav({
         />
         <NavItem
           onClick={onBanner}
-          href="/dashboard"
+          href="/dashboard?view=banner"
           icon={MegaphoneSimple}
           label="In-App Banner"
           sublabel="Message all users"
           active={isActive('banner')}
+          collapsed={collapsed}
+        />
+        <NavItem
+          href="/broadcast"
+          icon={Megaphone}
+          label="Broadcast to All"
+          sublabel="Push to every group"
+          active={isActive('broadcast')}
           collapsed={collapsed}
         />
 
@@ -159,17 +167,8 @@ export default function AdminNav({
         />
       </div>
 
-      {/* Bottom actions */}
-      <div className="p-2 border-t border-stone-800 shrink-0 flex flex-col gap-0.5">
-        <NavItem
-          onClick={onBroadcast}
-          href="/dashboard"
-          icon={Megaphone}
-          label="Broadcast to All"
-          sublabel="Push to every group"
-          active={isActive('broadcast')}
-          collapsed={collapsed}
-        />
+      {/* Logout */}
+      <div className="p-2 border-t border-stone-800 shrink-0">
         <button
           onClick={() => logoutAction()}
           className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-red-400 hover:bg-stone-800 hover:text-red-300 transition-colors w-full"

@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import { requireAuth } from '@/lib/session'
 import { loadGroups } from '@/actions/admin'
 import DashboardClient from '@/components/DashboardClient'
@@ -10,7 +11,9 @@ export default async function DashboardPage() {
   return (
     <>
       <IdleLogout />
-      <DashboardClient initialGroups={groups} />
+      <Suspense fallback={null}>
+        <DashboardClient initialGroups={groups} />
+      </Suspense>
     </>
   )
 }

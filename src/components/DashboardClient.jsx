@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useTransition, useMemo, useRef } from 'react'
+import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import {
   loadMembers,
@@ -233,6 +234,7 @@ function exportCSV(groupName, members) {
 }
 
 export default function DashboardClient({ initialGroups }) {
+  const searchParams = useSearchParams()
   const [groups, setGroups] = useState(initialGroups)
   const [selectedGroup, setSelectedGroup] = useState(null)
   const [members, setMembers] = useState([])
@@ -582,7 +584,12 @@ export default function DashboardClient({ initialGroups }) {
   }
 
   useEffect(() => {
-    handleSelectHome()
+    const view = searchParams.get('view')
+    if (view === 'groups') handleSelectGroups()
+    else if (view === 'orphans') handleSelectOrphans()
+    else if (view === 'banner') handleSelectBanner()
+    else handleSelectHome()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Stats
@@ -752,7 +759,6 @@ export default function DashboardClient({ initialGroups }) {
         onGroups={handleSelectGroups}
         onOrphans={handleSelectOrphans}
         onBanner={handleSelectBanner}
-        onBroadcast={() => { setBroadcastGroupName(''); setBroadcastTarget('all') }}
         orphanCount={orphanedUsers?.length ?? 0}
         activeView={showGroups ? 'groups' : showOrphans ? 'orphans' : showBanner ? 'banner' : 'overview'}
       />

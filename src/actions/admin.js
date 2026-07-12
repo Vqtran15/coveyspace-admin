@@ -430,6 +430,19 @@ export async function loadOrphanedUsers() {
   return { data: orphans }
 }
 
+export async function loadBroadcastHistoryAction({ limit = 30 } = {}) {
+  await requireAuth()
+  const { data, error } = await getSupabase()
+    .from('admin_audit_log')
+    .select('id, performed_at, target_label, metadata')
+    .eq('action', 'broadcast_push')
+    .eq('target_type', 'all')
+    .order('performed_at', { ascending: false })
+    .limit(limit)
+  if (error) return { error: error.message, data: [] }
+  return { data: data ?? [] }
+}
+
 export async function loadAuditLog() {
   await requireAuth()
   const { data, error } = await getSupabase()
