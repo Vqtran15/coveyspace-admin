@@ -65,7 +65,7 @@ export default function BroadcastClient({ initialHistory }) {
               <textarea
                 value={draft}
                 onChange={e => setDraft(e.target.value)}
-                placeholder="e.g. Men's group is tonight at 7 PM — see you there!"
+                placeholder="e.g. Reminder: this week's meetup is at 7 PM — see you there!"
                 rows={4}
                 className="w-full text-sm text-stone-800 border border-stone-200 rounded-xl px-3 py-2.5 resize-none outline-none focus:border-jade transition-colors"
               />
