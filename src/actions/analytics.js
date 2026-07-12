@@ -54,6 +54,7 @@ export async function loadGA4MetricsAction({ ga4Start = '30daysAgo', ga4End = 't
       landCtaByLocationResult,
       landDailyUsersResult,
       landChannelsResult,
+      appAllEventsResult,
       landAllEventsResult,
       landCtaSimpleResult,
     ] = await Promise.all([
@@ -202,6 +203,16 @@ export async function loadGA4MetricsAction({ ga4Start = '30daysAgo', ga4End = 't
         orderBys: [{ desc: true, metric: { metricName: 'sessions' } }],
         limit: 10,
       }),
+      // App: ALL event names — diagnostic to see what GA4 actually receives from app host
+      client.runReport({
+        property: GA4_PROPERTY,
+        dateRanges: dateRange,
+        dimensions: [{ name: 'eventName' }],
+        metrics: [{ name: 'eventCount' }],
+        dimensionFilter: hostFilter(APP),
+        orderBys: [{ desc: true, metric: { metricName: 'eventCount' } }],
+        limit: 30,
+      }),
       // Landing: ALL event names — diagnostic to find the real CTA event name (NEW)
       client.runReport({
         property: GA4_PROPERTY,
@@ -245,6 +256,7 @@ export async function loadGA4MetricsAction({ ga4Start = '30daysAgo', ga4End = 't
     const ctaByPage     = toList(landCtaByPageResult)
     const ctaByLocation = toList(landCtaByLocationResult)
     const channels      = toList(landChannelsResult)
+    const allAppEvents  = toList(appAllEventsResult)
     const allEvents     = toList(landAllEventsResult)
 
     const ctaClicks = (landCtaResult[0].rows ?? [])
@@ -275,6 +287,7 @@ export async function loadGA4MetricsAction({ ga4Start = '30daysAgo', ga4End = 't
           countries:   appCountries,
           cities:      appCities,
           dailyUsers:  toDailyList(appDailyUsersResult),
+          allEvents:   allAppEvents,
         },
         landing: {
           activeUsers30d: parseInt(landUsersResult[0].rows?.[0]?.metricValues?.[0]?.value ?? '0', 10),

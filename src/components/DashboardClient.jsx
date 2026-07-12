@@ -1440,6 +1440,36 @@ export default function DashboardClient({ initialGroups }) {
                               </div>
                             )}
                           </div>
+
+                          {/* All App Events — diagnostic: shows every event GA4 received from app.coveyspace.com */}
+                          {ga4.app.allEvents?.length > 0 && (
+                            <div>
+                              <h4 className="text-xs font-semibold text-stone-500 uppercase tracking-wider mb-3">All App Events (GA4 Diagnostic)</h4>
+                              <div className="bg-white rounded-2xl border border-stone-100 shadow-sm overflow-hidden">
+                                {ga4.app.allEvents.map((ev, i) => {
+                                  const max = ga4.app.allEvents[0].count || 1
+                                  const pct = Math.round((ev.count / max) * 100)
+                                  const isChat = ev.name === 'chat_message_sent'
+                                  return (
+                                    <div key={i} className={`flex items-center gap-3 px-4 py-3 border-b border-stone-50 last:border-0 ${isChat ? 'bg-amber-50' : ''}`}>
+                                      <span className={`text-sm w-52 shrink-0 font-mono ${isChat ? 'text-amber-700 font-semibold' : 'text-stone-700'}`}>{ev.name}</span>
+                                      <div className="flex-1 bg-stone-100 rounded-full h-1.5">
+                                        <div className={`h-1.5 rounded-full ${isChat ? 'bg-amber-400' : 'bg-indigo-400'}`} style={{ width: `${pct}%` }} />
+                                      </div>
+                                      <span className="text-xs text-stone-400 w-12 text-right tabular-nums">{ev.count.toLocaleString()}</span>
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                              <p className="text-xs text-stone-400 mt-2">If page_view shows but chat_message_sent is missing or low, GA4 is receiving data from this host but custom event tracking isn't firing.</p>
+                            </div>
+                          )}
+                          {ga4.app.allEvents?.length === 0 && (
+                            <div className="bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4">
+                              <p className="text-sm font-semibold text-amber-700">No events found for app.coveyspace.com in GA4</p>
+                              <p className="text-xs text-amber-600 mt-1">This means either the GA4_PROPERTY_ID in the admin env doesn't match the property that G-5MRR2181T2 sends to, or the hostname is different. Check GA4 → Reports → Realtime to see what hostname events are arriving under.</p>
+                            </div>
+                          )}
                         </div>
                         )
                       })()}
