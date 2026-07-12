@@ -43,8 +43,8 @@ export default function BroadcastClient({ initialHistory }) {
       const r = await broadcastPushAction({ body: draft.trim() })
       if (r.error) { setError(r.error); return }
       setDraft('')
-      const { data } = await loadBroadcastHistoryAction()
-      if (data) setHistory(data)
+      const result = await loadBroadcastHistoryAction()
+      if (!result.error) setHistory(result.data)
     })
   }
 
