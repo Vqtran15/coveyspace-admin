@@ -37,8 +37,11 @@ export async function loadGA4MetricsAction() {
       appUsers30dResult,
       appTabsResult,
       appSignupMethodResult,
+      appCountryResult,
+      appCityResult,
       landUsersResult,
       landCtaResult,
+      landCountryResult,
     ] = await Promise.all([
       // App: feature event counts (30d)
       client.runReport({
@@ -83,6 +86,26 @@ export async function loadGA4MetricsAction() {
         dimensionFilter: andFilter(hostFilter(APP), eventNameFilter('sign_up')),
         orderBys: [{ desc: true, metric: { metricName: 'eventCount' } }],
       }),
+      // App: active users by country (30d)
+      client.runReport({
+        property: GA4_PROPERTY,
+        dateRanges: [{ startDate: '30daysAgo', endDate: 'today' }],
+        dimensions: [{ name: 'country' }],
+        metrics: [{ name: 'activeUsers' }],
+        dimensionFilter: hostFilter(APP),
+        orderBys: [{ desc: true, metric: { metricName: 'activeUsers' } }],
+        limit: 10,
+      }),
+      // App: active users by city (30d)
+      client.runReport({
+        property: GA4_PROPERTY,
+        dateRanges: [{ startDate: '30daysAgo', endDate: 'today' }],
+        dimensions: [{ name: 'city' }],
+        metrics: [{ name: 'activeUsers' }],
+        dimensionFilter: hostFilter(APP),
+        orderBys: [{ desc: true, metric: { metricName: 'activeUsers' } }],
+        limit: 10,
+      }),
       // Landing: active users 30d
       client.runReport({
         property: GA4_PROPERTY,
@@ -99,17 +122,31 @@ export async function loadGA4MetricsAction() {
         dimensionFilter: andFilter(hostFilter(LAND), eventNameFilter('cta_click')),
         orderBys: [{ desc: true, metric: { metricName: 'eventCount' } }],
       }),
+      // Landing: active users by country (30d)
+      client.runReport({
+        property: GA4_PROPERTY,
+        dateRanges: [{ startDate: '30daysAgo', endDate: 'today' }],
+        dimensions: [{ name: 'country' }],
+        metrics: [{ name: 'activeUsers' }],
+        dimensionFilter: hostFilter(LAND),
+        orderBys: [{ desc: true, metric: { metricName: 'activeUsers' } }],
+        limit: 10,
+      }),
     ])
 
     const appEventMap = rowsToMap(appEventsResult[0].rows)
 
-    const tabs = (appTabsResult[0].rows ?? [])
-      .filter(r => r.dimensionValues[0].value !== '(not set)')
-      .map(r => ({ name: r.dimensionValues[0].value, count: parseInt(r.metricValues[0].value, 10) }))
+    function toList(result, valIndex = 0) {
+      return (result[0].rows ?? [])
+        .filter(r => r.dimensionValues[0].value !== '(not set)')
+        .map(r => ({ name: r.dimensionValues[0].value, count: parseInt(r.metricValues[valIndex].value, 10) }))
+    }
 
-    const signupMethods = (appSignupMethodResult[0].rows ?? [])
-      .filter(r => r.dimensionValues[0].value !== '(not set)')
-      .map(r => ({ name: r.dimensionValues[0].value, count: parseInt(r.metricValues[0].value, 10) }))
+    const tabs          = toList(appTabsResult)
+    const signupMethods = toList(appSignupMethodResult)
+    const appCountries  = toList(appCountryResult)
+    const appCities     = toList(appCityResult)
+    const landCountries = toList(landCountryResult)
 
     const ctaClicks = (landCtaResult[0].rows ?? [])
       .filter(r => r.dimensionValues[0].value !== '(not set)')
@@ -132,10 +169,13 @@ export async function loadGA4MetricsAction() {
           pushOptIns30d:      appEventMap['push_notifications_enabled'] ?? 0,
           tabs,
           signupMethods,
+          countries: appCountries,
+          cities:    appCities,
         },
         landing: {
           activeUsers30d: parseInt(landUsersResult[0].rows?.[0]?.metricValues?.[0]?.value ?? '0', 10),
           ctaClicks,
+          countries: landCountries,
         },
       },
     }
