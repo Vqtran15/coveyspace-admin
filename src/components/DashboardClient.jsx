@@ -800,6 +800,17 @@ export default function DashboardClient({ initialGroups }) {
                   <p className="text-xs text-stone-400 mt-0.5">View recent admin actions</p>
                 </div>
               </Link>
+              <Link
+                href="/errors"
+                onClick={() => setShowMenu(false)}
+                className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm hover:bg-stone-800 transition-colors"
+              >
+                <span>🚨</span>
+                <div>
+                  <p className="font-medium">Error Monitor</p>
+                  <p className="text-xs text-stone-400 mt-0.5">Runtime errors from the app</p>
+                </div>
+              </Link>
             </div>
             <div className="mt-auto p-4 border-t border-stone-700">
               <button

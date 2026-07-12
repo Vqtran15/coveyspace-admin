@@ -453,6 +453,40 @@ export async function loadGroupMessagesAction(groupId, { limit = 50, offset = 0 
   return { data: data ?? [] }
 }
 
+export async function loadClientErrorsAction({ limit = 100, includeResolved = false } = {}) {
+  await requireAuth()
+  const sb = getSupabase()
+  let q = sb
+    .from('client_errors')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(limit)
+  if (!includeResolved) q = q.is('resolved_at', null)
+  const { data, error } = await q
+  if (error) return { error: error.message }
+  return { data: data ?? [] }
+}
+
+export async function resolveErrorAction(id) {
+  await requireAuth()
+  const { error } = await getSupabase()
+    .from('client_errors')
+    .update({ resolved_at: new Date().toISOString() })
+    .eq('id', id)
+  if (error) return { error: error.message }
+  return { success: true }
+}
+
+export async function resolveAllErrorsAction() {
+  await requireAuth()
+  const { error } = await getSupabase()
+    .from('client_errors')
+    .update({ resolved_at: new Date().toISOString() })
+    .is('resolved_at', null)
+  if (error) return { error: error.message }
+  return { success: true }
+}
+
 export async function loadGroupActivityAction(groupId) {
   await requireAuth()
   const sb = getSupabase()
