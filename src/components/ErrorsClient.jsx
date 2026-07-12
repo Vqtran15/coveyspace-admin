@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import Link from 'next/link'
 import { loadClientErrorsAction, resolveErrorAction, resolveAllErrorsAction } from '@/actions/admin'
 
 const PT = 'America/Los_Angeles'
@@ -80,24 +79,19 @@ export default function ErrorsClient({ initialErrors, initialError }) {
   }
 
   return (
-    <div className="min-h-screen bg-sunrise-50 flex flex-col">
-      <header className="bg-stone-900 text-white px-6 py-4 flex items-center justify-between shrink-0">
-        <div>
-          <h1 className="text-lg font-bold tracking-tight">Error Monitor</h1>
-          <p className="text-xs text-stone-400 mt-0.5">
-            {showResolved ? 'All errors (including resolved)' : `${errors.length} open error${errors.length !== 1 ? 's' : ''}`}
-          </p>
-        </div>
-        <Link href="/dashboard" className="text-sm text-stone-300 hover:text-white transition-colors">
-          ← Dashboard
-        </Link>
-      </header>
+    <div className="h-full flex flex-col bg-sunrise-50">
+      <div className="bg-white border-b border-stone-100 px-6 py-4 shrink-0">
+        <h1 className="text-base font-semibold text-stone-800">Error Monitor</h1>
+        <p className="text-xs text-stone-400 mt-0.5">
+          {showResolved ? 'All errors (including resolved)' : `${errors.length} open error${errors.length !== 1 ? 's' : ''}`}
+        </p>
+      </div>
 
       {fetchError && (
-        <div className="bg-red-50 border-b border-red-200 px-6 py-3 text-sm text-red-700">{fetchError}</div>
+        <div className="bg-red-50 border-b border-red-200 px-6 py-3 text-sm text-red-700 shrink-0">{fetchError}</div>
       )}
 
-      <main className="flex-1 p-6">
+      <main className="flex-1 overflow-auto p-6">
         <div className="max-w-6xl mx-auto space-y-6">
 
           {/* Scorecards */}

@@ -23,7 +23,7 @@ import {
   loadGroupMessagesAction,
   loadGroupActivityAction,
 } from '@/actions/admin'
-import { logoutAction } from '@/actions/auth'
+import AdminNav from '@/components/AdminNav'
 import { loadGA4MetricsAction } from '@/actions/analytics'
 
 const PT = 'America/Los_Angeles'
@@ -747,78 +747,15 @@ export default function DashboardClient({ initialGroups }) {
         />
       )}
 
-      {/* Permanent left nav sidebar */}
-      <nav className="w-56 bg-stone-900 text-white flex flex-col shrink-0">
-        <div className="px-5 py-5 border-b border-stone-800">
-          <button onClick={handleSelectHome} className="text-left w-full">
-            <p className="text-sm font-bold tracking-tight">Covey Space Admin</p>
-            <p className="text-xs text-stone-400 mt-0.5">{groups.length} groups · {totalMembers} members</p>
-          </button>
-        </div>
-        <div className="flex flex-col p-3 gap-0.5 flex-1 overflow-y-auto">
-          <button onClick={handleSelectHome} className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-left hover:bg-stone-800 transition-colors w-full">
-            <span>🏠</span>
-            <div>
-              <p className="font-medium">Overview</p>
-              <p className="text-xs text-stone-400 mt-0.5">Metrics and activity</p>
-            </div>
-          </button>
-          <button onClick={handleSelectGroups} className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-left hover:bg-stone-800 transition-colors w-full">
-            <span>👥</span>
-            <div>
-              <p className="font-medium">Groups</p>
-              <p className="text-xs text-stone-400 mt-0.5">Manage communities</p>
-            </div>
-          </button>
-          <button onClick={() => { setBroadcastGroupName(''); setBroadcastTarget('all') }} className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-left hover:bg-stone-800 transition-colors w-full">
-            <span>📣</span>
-            <div>
-              <p className="font-medium">Broadcast to All</p>
-              <p className="text-xs text-stone-400 mt-0.5">Push to every group</p>
-            </div>
-          </button>
-          <button onClick={handleSelectOrphans} className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-left hover:bg-stone-800 transition-colors w-full">
-            <span>👻</span>
-            <div className="flex items-center gap-2">
-              <p className="font-medium">Orphaned Users</p>
-              {orphanedUsers !== null && orphanedUsers.length > 0 && (
-                <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400">
-                  {orphanedUsers.length}
-                </span>
-              )}
-            </div>
-          </button>
-          <button onClick={handleSelectBanner} className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-left hover:bg-stone-800 transition-colors w-full">
-            <span>📢</span>
-            <div>
-              <p className="font-medium">In-App Banner</p>
-              <p className="text-xs text-stone-400 mt-0.5">Message all users</p>
-            </div>
-          </button>
-          <Link href="/audit" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm hover:bg-stone-800 transition-colors">
-            <span>📋</span>
-            <div>
-              <p className="font-medium">Audit Log</p>
-              <p className="text-xs text-stone-400 mt-0.5">Recent admin actions</p>
-            </div>
-          </Link>
-          <Link href="/errors" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm hover:bg-stone-800 transition-colors">
-            <span>🚨</span>
-            <div>
-              <p className="font-medium">Error Monitor</p>
-              <p className="text-xs text-stone-400 mt-0.5">Runtime errors from app</p>
-            </div>
-          </Link>
-        </div>
-        <div className="p-3 border-t border-stone-800">
-          <button
-            onClick={() => logoutAction()}
-            className="w-full px-3 py-2 text-sm font-medium text-red-400 hover:bg-stone-800 rounded-xl transition-colors text-left"
-          >
-            Log out
-          </button>
-        </div>
-      </nav>
+      <AdminNav
+        onHome={handleSelectHome}
+        onGroups={handleSelectGroups}
+        onOrphans={handleSelectOrphans}
+        onBanner={handleSelectBanner}
+        onBroadcast={() => { setBroadcastGroupName(''); setBroadcastTarget('all') }}
+        orphanCount={orphanedUsers?.length ?? 0}
+        activeView={showGroups ? 'groups' : showOrphans ? 'orphans' : showBanner ? 'banner' : 'overview'}
+      />
 
       {/* Main content column */}
       <div className="flex-1 flex flex-col overflow-hidden bg-sunrise-50">

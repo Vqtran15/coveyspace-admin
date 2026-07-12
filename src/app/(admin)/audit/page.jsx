@@ -1,6 +1,5 @@
 import { requireAuth } from '@/lib/session'
 import { loadAuditLog } from '@/actions/admin'
-import Link from 'next/link'
 
 function formatTime(iso) {
   if (!iso) return '—'
@@ -35,22 +34,17 @@ export default async function AuditPage() {
   const { data: entries = [], error } = await loadAuditLog()
 
   return (
-    <div className="min-h-screen bg-sunrise-50 flex flex-col">
-      <header className="bg-stone-900 text-white px-6 py-4 flex items-center justify-between shrink-0">
-        <div>
-          <h1 className="text-lg font-bold tracking-tight">Audit Log</h1>
-          <p className="text-xs text-stone-400 mt-0.5">Last {entries.length} admin actions</p>
-        </div>
-        <Link href="/dashboard" className="text-sm text-stone-300 hover:text-white transition-colors">
-          ← Dashboard
-        </Link>
-      </header>
+    <div className="h-full flex flex-col bg-sunrise-50">
+      <div className="bg-white border-b border-stone-100 px-6 py-4 shrink-0">
+        <h1 className="text-base font-semibold text-stone-800">Audit Log</h1>
+        <p className="text-xs text-stone-400 mt-0.5">Last {entries.length} admin actions</p>
+      </div>
 
       {error && (
-        <div className="bg-red-50 border-b border-red-200 px-6 py-3 text-sm text-red-700">{error}</div>
+        <div className="bg-red-50 border-b border-red-200 px-6 py-3 text-sm text-red-700 shrink-0">{error}</div>
       )}
 
-      <main className="flex-1 p-6">
+      <main className="flex-1 overflow-auto p-6">
         <div className="max-w-5xl mx-auto">
           {entries.length === 0 ? (
             <div className="text-center py-16 text-stone-400">
