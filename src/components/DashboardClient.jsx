@@ -1225,35 +1225,46 @@ export default function DashboardClient({ initialGroups }) {
                   {overviewTab === 'analytics' && (ga4 ? (
                     <div className="mt-2 space-y-6">
 
-                      {/* Host selector */}
-                      <div className="flex gap-1">
-                        {[
-                          { id: 'app',     label: 'app.coveyspace.com' },
-                          { id: 'landing', label: 'www.coveyspace.com' },
-                        ].map(h => (
-                          <button
-                            key={h.id}
-                            onClick={() => setAnalyticsHost(h.id)}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${analyticsHost === h.id ? 'bg-stone-800 text-white' : 'text-stone-400 hover:text-stone-600 border border-stone-200'}`}
-                          >
-                            {h.label}
-                          </button>
-                        ))}
+                      {/* Host selector + loading indicator */}
+                      <div className="flex items-center gap-2">
+                        <div className="flex gap-1">
+                          {[
+                            { id: 'app',     label: 'app.coveyspace.com' },
+                            { id: 'landing', label: 'www.coveyspace.com' },
+                          ].map(h => (
+                            <button
+                              key={h.id}
+                              onClick={() => setAnalyticsHost(h.id)}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${analyticsHost === h.id ? 'bg-stone-800 text-white' : 'text-stone-400 hover:text-stone-600 border border-stone-200'}`}
+                            >
+                              {h.label}
+                            </button>
+                          ))}
+                        </div>
+                        {loadingGa4 && (
+                          <div className="flex items-center gap-1.5 text-stone-400">
+                            <div className="w-3 h-3 rounded-full border-2 border-stone-200 border-t-stone-400 animate-spin" />
+                            <span className="text-xs">Updating…</span>
+                          </div>
+                        )}
                       </div>
 
                       {/* ── app.coveyspace.com ── */}
-                      {analyticsHost === 'app' && (
-                        <div className="space-y-6">
+                      {analyticsHost === 'app' && (() => {
+                        const { label: periodLabel } = getQueryDates()
+                        return (
+                        <div className={`space-y-6 transition-opacity duration-200 ${loadingGa4 ? 'opacity-40 pointer-events-none' : ''}`}>
                           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                             {[
-                              { label: 'Active Users (7d)',  value: ga4.app.activeUsers7d.toLocaleString() },
-                              { label: 'Active Users (30d)', value: ga4.app.activeUsers30d.toLocaleString() },
-                              { label: 'New Sign-ups',       value: ga4.app.signups30d.toLocaleString() },
-                              { label: 'Logins',             value: ga4.app.logins30d.toLocaleString() },
-                            ].map(({ label, value }) => (
+                              { label: 'Active Users',  value: ga4.app.activeUsers7d.toLocaleString(),  sub: periodLabel },
+                              { label: 'New Sign-ups',  value: ga4.app.signups30d.toLocaleString(),     sub: periodLabel },
+                              { label: 'Logins',        value: ga4.app.logins30d.toLocaleString(),      sub: periodLabel },
+                              { label: 'Chat Messages', value: ga4.app.chatMessages30d.toLocaleString(), sub: periodLabel },
+                            ].map(({ label, value, sub }) => (
                               <div key={label} className="bg-white rounded-2xl border border-stone-100 px-5 py-4 shadow-sm">
                                 <p className="text-xs font-semibold text-stone-400 uppercase tracking-wider mb-1">{label}</p>
                                 <p className="text-3xl font-bold text-stone-800">{value}</p>
+                                {sub && <p className="text-xs text-stone-400 mt-0.5">{sub}</p>}
                               </div>
                             ))}
                           </div>
@@ -1370,19 +1381,24 @@ export default function DashboardClient({ initialGroups }) {
                             )}
                           </div>
                         </div>
-                      )}
+                        )
+                      })()}
 
                       {/* ── www.coveyspace.com ── */}
-                      {analyticsHost === 'landing' && (
-                        <div className="space-y-6">
+                      {analyticsHost === 'landing' && (() => {
+                        const { label: periodLabel } = getQueryDates()
+                        return (
+                        <div className={`space-y-6 transition-opacity duration-200 ${loadingGa4 ? 'opacity-40 pointer-events-none' : ''}`}>
                           <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
                             <div className="bg-white rounded-2xl border border-stone-100 px-5 py-4 shadow-sm">
                               <p className="text-xs font-semibold text-stone-400 uppercase tracking-wider mb-1">Active Users</p>
                               <p className="text-3xl font-bold text-stone-800">{ga4.landing.activeUsers30d.toLocaleString()}</p>
+                              <p className="text-xs text-stone-400 mt-0.5">{periodLabel}</p>
                             </div>
                             <div className="bg-white rounded-2xl border border-stone-100 px-5 py-4 shadow-sm">
                               <p className="text-xs font-semibold text-stone-400 uppercase tracking-wider mb-1">CTA Clicks</p>
                               <p className="text-3xl font-bold text-stone-800">{ga4.landing.ctaClicks.reduce((s, c) => s + c.count, 0).toLocaleString()}</p>
+                              <p className="text-xs text-stone-400 mt-0.5">{periodLabel}</p>
                             </div>
                           </div>
 
@@ -1476,7 +1492,8 @@ export default function DashboardClient({ initialGroups }) {
                             )}
                           </div>
                         </div>
-                      )}
+                        )
+                      })()}
 
                     </div>
                   ) : loadingGa4 ? (
