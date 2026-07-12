@@ -3,15 +3,27 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import {
+  House,
+  UsersThree,
+  Ghost,
+  MegaphoneSimple,
+  ClipboardText,
+  Warning,
+  Megaphone,
+  CaretLeft,
+  CaretRight,
+  SignOut,
+} from '@phosphor-icons/react'
 import { logoutAction } from '@/actions/auth'
 
-function NavItem({ onClick, href, icon, label, sublabel, active, badge, collapsed }) {
+function NavItem({ onClick, href, icon: Icon, label, sublabel, active, badge, collapsed }) {
   const cls = `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-left w-full transition-colors ${
     active ? 'bg-stone-700 text-white' : 'text-stone-300 hover:bg-stone-800 hover:text-white'
   }`
   const content = (
     <>
-      <span className="shrink-0 text-base leading-none">{icon}</span>
+      <Icon size={18} weight={active ? 'fill' : 'regular'} className="shrink-0" />
       {!collapsed && (
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
@@ -81,16 +93,19 @@ export default function AdminNav({
           className="shrink-0 w-8 h-8 flex items-center justify-center rounded-lg text-stone-400 hover:text-white hover:bg-stone-800 transition-colors ml-auto"
           aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         >
-          <span className="text-xl leading-none">{collapsed ? '›' : '‹'}</span>
+          {collapsed
+            ? <CaretRight size={14} weight="bold" />
+            : <CaretLeft size={14} weight="bold" />
+          }
         </button>
       </div>
 
-      {/* Nav items */}
+      {/* Main nav */}
       <div className="flex flex-col p-2 gap-0.5 flex-1 overflow-y-auto">
         <NavItem
           onClick={onHome}
           href="/dashboard"
-          icon="🏠"
+          icon={House}
           label="Overview"
           sublabel="Metrics and activity"
           active={isActive('overview')}
@@ -99,25 +114,16 @@ export default function AdminNav({
         <NavItem
           onClick={onGroups}
           href="/dashboard"
-          icon="👥"
+          icon={UsersThree}
           label="Groups"
           sublabel="Manage communities"
           active={isActive('groups')}
           collapsed={collapsed}
         />
         <NavItem
-          onClick={onBroadcast}
-          href="/dashboard"
-          icon="📣"
-          label="Broadcast to All"
-          sublabel="Push to every group"
-          active={isActive('broadcast')}
-          collapsed={collapsed}
-        />
-        <NavItem
           onClick={onOrphans}
           href="/dashboard"
-          icon="👻"
+          icon={Ghost}
           label="Orphaned Users"
           active={isActive('orphans')}
           badge={orphanCount}
@@ -126,16 +132,18 @@ export default function AdminNav({
         <NavItem
           onClick={onBanner}
           href="/dashboard"
-          icon="📢"
+          icon={MegaphoneSimple}
           label="In-App Banner"
           sublabel="Message all users"
           active={isActive('banner')}
           collapsed={collapsed}
         />
+
         <div className="my-1 border-t border-stone-800" />
+
         <NavItem
           href="/audit"
-          icon="📋"
+          icon={ClipboardText}
           label="Audit Log"
           sublabel="Recent admin actions"
           active={isActive('audit')}
@@ -143,7 +151,7 @@ export default function AdminNav({
         />
         <NavItem
           href="/errors"
-          icon="🚨"
+          icon={Warning}
           label="Error Monitor"
           sublabel="Runtime errors from app"
           active={isActive('errors')}
@@ -151,13 +159,22 @@ export default function AdminNav({
         />
       </div>
 
-      {/* Logout */}
-      <div className="p-2 border-t border-stone-800 shrink-0">
+      {/* Bottom actions */}
+      <div className="p-2 border-t border-stone-800 shrink-0 flex flex-col gap-0.5">
+        <NavItem
+          onClick={onBroadcast}
+          href="/dashboard"
+          icon={Megaphone}
+          label="Broadcast to All"
+          sublabel="Push to every group"
+          active={isActive('broadcast')}
+          collapsed={collapsed}
+        />
         <button
           onClick={() => logoutAction()}
           className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-red-400 hover:bg-stone-800 hover:text-red-300 transition-colors w-full"
         >
-          <span className="shrink-0 text-base leading-none">🚪</span>
+          <SignOut size={18} className="shrink-0" />
           {!collapsed && <p className="font-medium">Log out</p>}
         </button>
       </div>

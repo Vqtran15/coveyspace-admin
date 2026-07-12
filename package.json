@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@google-analytics/data": "^6.1.0",
+    "@phosphor-icons/react": "^2.1.10",
     "@supabase/supabase-js": "^2.39.0",
     "jose": "^5.2.0",
     "next": "^14.2.0",
