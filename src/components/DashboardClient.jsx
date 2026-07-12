@@ -1506,7 +1506,7 @@ export default function DashboardClient({ initialGroups }) {
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                               {ga4.landing.ctaByPage.length > 0 && (
                                 <div>
-                                  <h4 className="text-xs font-semibold text-stone-500 uppercase tracking-wider mb-3">CTA Clicks by Page</h4>
+                                  <h4 className="text-xs font-semibold text-stone-500 uppercase tracking-wider mb-3">CTA Clicks by Page Path</h4>
                                   <div className="bg-white rounded-2xl border border-stone-100 shadow-sm overflow-hidden">
                                     {ga4.landing.ctaByPage.map((c, i) => {
                                       const max = ga4.landing.ctaByPage[0].count || 1
@@ -1526,7 +1526,7 @@ export default function DashboardClient({ initialGroups }) {
                               )}
                               {ga4.landing.ctaByLocation.length > 0 && (
                                 <div>
-                                  <h4 className="text-xs font-semibold text-stone-500 uppercase tracking-wider mb-3">CTA Clicks by Location</h4>
+                                  <h4 className="text-xs font-semibold text-stone-500 uppercase tracking-wider mb-3">CTA Clicks by Button Text</h4>
                                   <div className="bg-white rounded-2xl border border-stone-100 shadow-sm overflow-hidden">
                                     {ga4.landing.ctaByLocation.map((c, i) => {
                                       const max = ga4.landing.ctaByLocation[0].count || 1

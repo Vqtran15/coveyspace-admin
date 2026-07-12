@@ -136,11 +136,11 @@ export async function loadGA4MetricsAction({ ga4Start = '30daysAgo', ga4End = 't
         metrics: [{ name: 'activeUsers' }],
         dimensionFilter: hostFilter(LAND),
       }),
-      // Landing: CTA clicks with page+location dimensions
+      // Landing: CTA clicks with page_path+click_text dimensions (GTM-based params)
       client.runReport({
         property: GA4_PROPERTY,
         dateRanges: dateRange,
-        dimensions: [{ name: 'customEvent:page' }, { name: 'customEvent:location' }],
+        dimensions: [{ name: 'customEvent:page_path' }, { name: 'customEvent:click_text' }],
         metrics: [{ name: 'eventCount' }],
         dimensionFilter: andFilter(hostFilter(LAND), eventNameFilter('cta_click')),
         orderBys: [{ desc: true, metric: { metricName: 'eventCount' } }],
@@ -165,20 +165,20 @@ export async function loadGA4MetricsAction({ ga4Start = '30daysAgo', ga4End = 't
         orderBys: [{ desc: true, metric: { metricName: 'activeUsers' } }],
         limit: 10,
       }),
-      // Landing: CTA clicks by page only
+      // Landing: CTA clicks by page_path
       client.runReport({
         property: GA4_PROPERTY,
         dateRanges: dateRange,
-        dimensions: [{ name: 'customEvent:page' }],
+        dimensions: [{ name: 'customEvent:page_path' }],
         metrics: [{ name: 'eventCount' }],
         dimensionFilter: andFilter(hostFilter(LAND), eventNameFilter('cta_click')),
         orderBys: [{ desc: true, metric: { metricName: 'eventCount' } }],
       }),
-      // Landing: CTA clicks by location only
+      // Landing: CTA clicks by click_text
       client.runReport({
         property: GA4_PROPERTY,
         dateRanges: dateRange,
-        dimensions: [{ name: 'customEvent:location' }],
+        dimensions: [{ name: 'customEvent:click_text' }],
         metrics: [{ name: 'eventCount' }],
         dimensionFilter: andFilter(hostFilter(LAND), eventNameFilter('cta_click')),
         orderBys: [{ desc: true, metric: { metricName: 'eventCount' } }],
