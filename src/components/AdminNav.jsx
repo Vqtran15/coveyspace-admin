@@ -6,11 +6,11 @@ import { usePathname } from 'next/navigation'
 import {
   House,
   UsersThree,
-  Ghost,
-  MegaphoneSimple,
-  ClipboardText,
   Warning,
+  MegaphoneSimple,
   Megaphone,
+  Ghost,
+  ClipboardText,
   CaretLeft,
   CaretRight,
   SignOut,
@@ -100,7 +100,7 @@ export default function AdminNav({
         </button>
       </div>
 
-      {/* Main nav */}
+      {/* Nav items */}
       <div className="flex flex-col p-2 gap-0.5 flex-1 overflow-y-auto">
         <NavItem
           onClick={onHome}
@@ -121,12 +121,11 @@ export default function AdminNav({
           collapsed={collapsed}
         />
         <NavItem
-          onClick={onOrphans}
-          href="/dashboard?view=orphans"
-          icon={Ghost}
-          label="Orphaned Users"
-          active={isActive('orphans')}
-          badge={orphanCount}
+          href="/errors"
+          icon={Warning}
+          label="Error Monitor"
+          sublabel="Runtime errors from app"
+          active={isActive('errors')}
           collapsed={collapsed}
         />
         <NavItem
@@ -146,23 +145,21 @@ export default function AdminNav({
           active={isActive('broadcast')}
           collapsed={collapsed}
         />
-
-        <div className="my-1 border-t border-stone-800" />
-
+        <NavItem
+          onClick={onOrphans}
+          href="/dashboard?view=orphans"
+          icon={Ghost}
+          label="Orphaned Users"
+          active={isActive('orphans')}
+          badge={orphanCount}
+          collapsed={collapsed}
+        />
         <NavItem
           href="/audit"
           icon={ClipboardText}
           label="Audit Log"
           sublabel="Recent admin actions"
           active={isActive('audit')}
-          collapsed={collapsed}
-        />
-        <NavItem
-          href="/errors"
-          icon={Warning}
-          label="Error Monitor"
-          sublabel="Runtime errors from app"
-          active={isActive('errors')}
           collapsed={collapsed}
         />
       </div>

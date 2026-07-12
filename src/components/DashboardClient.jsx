@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useTransition, useMemo, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
+import { motion, AnimatePresence } from 'framer-motion'
+import { UsersThree, Megaphone } from '@phosphor-icons/react'
 import Link from 'next/link'
 import {
   loadMembers,
@@ -596,6 +598,7 @@ export default function DashboardClient({ initialGroups }) {
   const totalMembers = groups.reduce((s, g) => s + (g.member_count || 0), 0)
   const emptyGroups = groups.filter(g => (g.member_count || 0) === 0).length
   const adminCount = members.filter(m => m.role === 'admin').length
+  const viewKey = showGlobalSearch ? 'search' : showGroups ? 'groups' : showOrphans ? 'orphans' : showBanner ? 'banner' : 'overview'
 
   const groupLastActive = useMemo(() => {
     return members.reduce((latest, m) => {
@@ -860,13 +863,21 @@ export default function DashboardClient({ initialGroups }) {
         </aside>}
 
         {/* Main panel */}
-        <main className="flex-1 overflow-auto p-6">
+        <AnimatePresence mode="wait" initial={false}>
+        <motion.main
+          key={viewKey}
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.15, ease: 'easeOut' }}
+          className="flex-1 overflow-auto p-6"
+        >
 
           {/* Empty state — only in groups view when no group selected */}
           {showGroups && !selectedGroup && (
             <div className="flex items-center justify-center h-full text-stone-400">
               <div className="text-center">
-                <p className="text-4xl mb-3">👥</p>
+                <UsersThree size={40} weight="thin" className="mx-auto mb-3 text-stone-300" />
                 <p className="text-sm">Select a group to view details</p>
               </div>
             </div>
@@ -1587,7 +1598,7 @@ export default function DashboardClient({ initialGroups }) {
                             onClick={() => { setShowGroupMenu(false); setBroadcastGroupName(selectedGroup.name); setBroadcastTarget(selectedGroup.id) }}
                             className="w-full text-left px-4 py-2.5 text-sm text-stone-700 hover:bg-stone-50 transition-colors"
                           >
-                            📣 Broadcast to all
+                            <Megaphone size={14} className="inline mr-1.5 -mt-0.5" />Broadcast to all
                           </button>
                           <button
                             onClick={() => { setShowGroupMenu(false); exportCSV(selectedGroup.name, members) }}
@@ -1660,7 +1671,7 @@ export default function DashboardClient({ initialGroups }) {
                           onClick={() => { setBroadcastGroupName(selectedGroup.name); setBroadcastTarget('selected') }}
                           className="px-3 py-1 text-xs font-medium rounded-lg bg-jade text-white hover:opacity-90 transition-colors"
                         >
-                          📣 Broadcast
+                          <Megaphone size={13} weight="fill" className="inline mr-1 -mt-0.5" />Broadcast
                         </button>
                         {single && (
                           <>
@@ -1939,7 +1950,8 @@ export default function DashboardClient({ initialGroups }) {
               )}
             </div>
           )}
-        </main>
+        </motion.main>
+        </AnimatePresence>
       </div>
       </div>
     </div>
