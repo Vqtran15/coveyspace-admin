@@ -26,10 +26,11 @@ function eventNameFilter(value) {
 const APP  = 'app.coveyspace.com'
 const LAND = 'www.coveyspace.com'
 
-export async function loadGA4MetricsAction() {
+export async function loadGA4MetricsAction({ ga4Start = '30daysAgo', ga4End = 'today' } = {}) {
   await requireAuth()
   try {
     const client = getGA4Client()
+    const dateRange = [{ startDate: ga4Start, endDate: ga4End }]
 
     const [
       appEventsResult,
@@ -42,11 +43,14 @@ export async function loadGA4MetricsAction() {
       landUsersResult,
       landCtaResult,
       landCountryResult,
+      landCityResult,
+      landCtaByPageResult,
+      landCtaByLocationResult,
     ] = await Promise.all([
       // App: feature event counts (30d)
       client.runReport({
         property: GA4_PROPERTY,
-        dateRanges: [{ startDate: '30daysAgo', endDate: 'today' }],
+        dateRanges: dateRange,
         dimensions: [{ name: 'eventName' }],
         metrics: [{ name: 'eventCount' }],
         dimensionFilter: andFilter(
@@ -57,21 +61,21 @@ export async function loadGA4MetricsAction() {
       // App: active users 7d
       client.runReport({
         property: GA4_PROPERTY,
-        dateRanges: [{ startDate: '7daysAgo', endDate: 'today' }],
+        dateRanges: dateRange,
         metrics: [{ name: 'activeUsers' }],
         dimensionFilter: hostFilter(APP),
       }),
       // App: active users 30d
       client.runReport({
         property: GA4_PROPERTY,
-        dateRanges: [{ startDate: '30daysAgo', endDate: 'today' }],
+        dateRanges: dateRange,
         metrics: [{ name: 'activeUsers' }],
         dimensionFilter: hostFilter(APP),
       }),
       // App: tab views by tab name (30d)
       client.runReport({
         property: GA4_PROPERTY,
-        dateRanges: [{ startDate: '30daysAgo', endDate: 'today' }],
+        dateRanges: dateRange,
         dimensions: [{ name: 'customEvent:tab_name' }],
         metrics: [{ name: 'eventCount' }],
         dimensionFilter: andFilter(hostFilter(APP), eventNameFilter('tab_view')),
@@ -80,7 +84,7 @@ export async function loadGA4MetricsAction() {
       // App: sign-up method breakdown (30d)
       client.runReport({
         property: GA4_PROPERTY,
-        dateRanges: [{ startDate: '30daysAgo', endDate: 'today' }],
+        dateRanges: dateRange,
         dimensions: [{ name: 'customEvent:method' }],
         metrics: [{ name: 'eventCount' }],
         dimensionFilter: andFilter(hostFilter(APP), eventNameFilter('sign_up')),
@@ -89,7 +93,7 @@ export async function loadGA4MetricsAction() {
       // App: active users by country (30d)
       client.runReport({
         property: GA4_PROPERTY,
-        dateRanges: [{ startDate: '30daysAgo', endDate: 'today' }],
+        dateRanges: dateRange,
         dimensions: [{ name: 'country' }],
         metrics: [{ name: 'activeUsers' }],
         dimensionFilter: hostFilter(APP),
@@ -99,7 +103,7 @@ export async function loadGA4MetricsAction() {
       // App: active users by city (30d)
       client.runReport({
         property: GA4_PROPERTY,
-        dateRanges: [{ startDate: '30daysAgo', endDate: 'today' }],
+        dateRanges: dateRange,
         dimensions: [{ name: 'city' }],
         metrics: [{ name: 'activeUsers' }],
         dimensionFilter: hostFilter(APP),
@@ -109,14 +113,14 @@ export async function loadGA4MetricsAction() {
       // Landing: active users 30d
       client.runReport({
         property: GA4_PROPERTY,
-        dateRanges: [{ startDate: '30daysAgo', endDate: 'today' }],
+        dateRanges: dateRange,
         metrics: [{ name: 'activeUsers' }],
         dimensionFilter: hostFilter(LAND),
       }),
       // Landing: CTA clicks by page + location (30d)
       client.runReport({
         property: GA4_PROPERTY,
-        dateRanges: [{ startDate: '30daysAgo', endDate: 'today' }],
+        dateRanges: dateRange,
         dimensions: [{ name: 'customEvent:page' }, { name: 'customEvent:location' }],
         metrics: [{ name: 'eventCount' }],
         dimensionFilter: andFilter(hostFilter(LAND), eventNameFilter('cta_click')),
@@ -125,12 +129,40 @@ export async function loadGA4MetricsAction() {
       // Landing: active users by country (30d)
       client.runReport({
         property: GA4_PROPERTY,
-        dateRanges: [{ startDate: '30daysAgo', endDate: 'today' }],
+        dateRanges: dateRange,
         dimensions: [{ name: 'country' }],
         metrics: [{ name: 'activeUsers' }],
         dimensionFilter: hostFilter(LAND),
         orderBys: [{ desc: true, metric: { metricName: 'activeUsers' } }],
         limit: 10,
+      }),
+      // Landing: active users by city
+      client.runReport({
+        property: GA4_PROPERTY,
+        dateRanges: dateRange,
+        dimensions: [{ name: 'city' }],
+        metrics: [{ name: 'activeUsers' }],
+        dimensionFilter: hostFilter(LAND),
+        orderBys: [{ desc: true, metric: { metricName: 'activeUsers' } }],
+        limit: 10,
+      }),
+      // Landing: CTA clicks by page only
+      client.runReport({
+        property: GA4_PROPERTY,
+        dateRanges: dateRange,
+        dimensions: [{ name: 'customEvent:page' }],
+        metrics: [{ name: 'eventCount' }],
+        dimensionFilter: andFilter(hostFilter(LAND), eventNameFilter('cta_click')),
+        orderBys: [{ desc: true, metric: { metricName: 'eventCount' } }],
+      }),
+      // Landing: CTA clicks by location only
+      client.runReport({
+        property: GA4_PROPERTY,
+        dateRanges: dateRange,
+        dimensions: [{ name: 'customEvent:location' }],
+        metrics: [{ name: 'eventCount' }],
+        dimensionFilter: andFilter(hostFilter(LAND), eventNameFilter('cta_click')),
+        orderBys: [{ desc: true, metric: { metricName: 'eventCount' } }],
       }),
     ])
 
@@ -138,7 +170,7 @@ export async function loadGA4MetricsAction() {
 
     function toList(result, valIndex = 0) {
       return (result[0].rows ?? [])
-        .filter(r => r.dimensionValues[0].value !== '(not set)')
+        .filter(r => r.dimensionValues[0].value && r.dimensionValues[0].value !== '(not set)')
         .map(r => ({ name: r.dimensionValues[0].value, count: parseInt(r.metricValues[valIndex].value, 10) }))
     }
 
@@ -147,9 +179,12 @@ export async function loadGA4MetricsAction() {
     const appCountries  = toList(appCountryResult)
     const appCities     = toList(appCityResult)
     const landCountries = toList(landCountryResult)
+    const landCities    = toList(landCityResult)
+    const ctaByPage     = toList(landCtaByPageResult)
+    const ctaByLocation = toList(landCtaByLocationResult)
 
     const ctaClicks = (landCtaResult[0].rows ?? [])
-      .filter(r => r.dimensionValues[0].value !== '(not set)')
+      .filter(r => r.dimensionValues[0].value && r.dimensionValues[0].value !== '(not set)')
       .map(r => ({
         page:     r.dimensionValues[0].value,
         location: r.dimensionValues[1].value,
@@ -175,7 +210,10 @@ export async function loadGA4MetricsAction() {
         landing: {
           activeUsers30d: parseInt(landUsersResult[0].rows?.[0]?.metricValues?.[0]?.value ?? '0', 10),
           ctaClicks,
+          ctaByPage,
+          ctaByLocation,
           countries: landCountries,
+          cities:    landCities,
         },
       },
     }

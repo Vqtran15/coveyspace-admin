@@ -281,19 +281,18 @@ export async function deleteAllOrphanedUsersAction(orphanIds) {
   }
 }
 
-export async function loadMetricsAction() {
+export async function loadMetricsAction({ periodStart, periodEnd } = {}) {
   await requireAuth()
   const sb = getSupabase()
-  const d7  = new Date(Date.now() - 7  * 86400000).toISOString()
-  const d30 = new Date(Date.now() - 30 * 86400000).toISOString()
+  const start = periodStart ?? new Date(Date.now() - 30 * 86400000).toISOString()
+  const end   = periodEnd   ?? new Date().toISOString()
 
   const [
     { count: totalGroups },
     { count: totalMembers },
-    { count: newGroups30d },
-    { count: newMembers30d },
-    { count: messages7d },
-    { count: messages30d },
+    { count: newGroupsInPeriod },
+    { count: newMembersInPeriod },
+    { count: messagesInPeriod },
     { data: groupsWithMembers },
     { data: convData },
     { data: profilesData },
@@ -301,10 +300,9 @@ export async function loadMetricsAction() {
   ] = await Promise.all([
     sb.from('community_groups').select('*', { count: 'exact', head: true }),
     sb.from('profiles').select('*', { count: 'exact', head: true }),
-    sb.from('community_groups').select('*', { count: 'exact', head: true }).gte('created_at', d30),
-    sb.from('profiles').select('*', { count: 'exact', head: true }).gte('created_at', d30),
-    sb.from('messages').select('*', { count: 'exact', head: true }).gte('created_at', d7),
-    sb.from('messages').select('*', { count: 'exact', head: true }).gte('created_at', d30),
+    sb.from('community_groups').select('*', { count: 'exact', head: true }).gte('created_at', start).lte('created_at', end),
+    sb.from('profiles').select('*', { count: 'exact', head: true }).gte('created_at', start).lte('created_at', end),
+    sb.from('messages').select('*', { count: 'exact', head: true }).gte('created_at', start).lte('created_at', end),
     sb.from('community_groups').select('id, name, created_at, profiles(count)').order('created_at', { ascending: false }),
     sb.from('conversations').select('community_group_id, updated_at, messages(count)'),
     sb.from('profiles').select('user_id, community_group_id'),
@@ -338,12 +336,11 @@ export async function loadMetricsAction() {
 
   return {
     data: {
-      totalGroups:  totalGroups  ?? 0,
-      totalMembers: totalMembers ?? 0,
-      newGroups30d: newGroups30d ?? 0,
-      newMembers30d: newMembers30d ?? 0,
-      messages7d:  messages7d  ?? 0,
-      messages30d: messages30d ?? 0,
+      totalGroups:        totalGroups        ?? 0,
+      totalMembers:       totalMembers       ?? 0,
+      newGroupsInPeriod:  newGroupsInPeriod  ?? 0,
+      newMembersInPeriod: newMembersInPeriod ?? 0,
+      messagesInPeriod:   messagesInPeriod   ?? 0,
       groupStats,
     }
   }
