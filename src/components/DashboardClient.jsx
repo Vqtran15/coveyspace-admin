@@ -20,6 +20,8 @@ import {
   publishAnnouncementAction,
   deactivateAnnouncementAction,
   loadMetricsAction,
+  loadGroupMessagesAction,
+  loadGroupActivityAction,
 } from '@/actions/admin'
 import { logoutAction } from '@/actions/auth'
 import { loadGA4MetricsAction } from '@/actions/analytics'
@@ -174,6 +176,37 @@ function FeatureFlags({ settings }) {
   )
 }
 
+function ActivityList({ items, empty, renderRow }) {
+  if (!items || items.length === 0) {
+    return (
+      <div className="bg-white rounded-2xl border border-stone-100 py-12 text-center text-stone-400">
+        <p className="text-sm">{empty}</p>
+      </div>
+    )
+  }
+  return (
+    <div className="bg-white rounded-2xl border border-stone-200 overflow-hidden divide-y divide-stone-50">
+      {items.map((item, i) => {
+        const { title, subtitle, body, date } = renderRow(item)
+        return (
+          <div key={item.id ?? i} className="px-5 py-3">
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium text-stone-800 truncate">{title}</p>
+                {subtitle && <p className="text-xs text-stone-500 mt-0.5">{subtitle}</p>}
+                {body && <p className="text-sm text-stone-600 mt-1 leading-snug">{body}</p>}
+              </div>
+              <span className="text-xs text-stone-400 whitespace-nowrap shrink-0 mt-0.5">{
+                date ? new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'
+              }</span>
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 function exportCSV(groupName, members) {
   const headers = ['Name', 'Email', 'Role', 'Last Activity', 'Last Logged In', 'Joined']
   const rows = members.map(m => [
@@ -218,6 +251,15 @@ export default function DashboardClient({ initialGroups }) {
   const [customEnd, setCustomEnd]       = useState('')
   const [ga4, setGa4]                   = useState(null)
   const [loadingGa4, setLoadingGa4]     = useState(false)
+
+  const [groupDetailTab, setGroupDetailTab] = useState('members')
+  const [groupMessages, setGroupMessages] = useState([])
+  const [loadingMessages, setLoadingMessages] = useState(false)
+  const [messagesOffset, setMessagesOffset] = useState(0)
+  const [messagesHasMore, setMessagesHasMore] = useState(false)
+  const [groupActivity, setGroupActivity] = useState(null)
+  const [loadingActivity, setLoadingActivity] = useState(false)
+  const [activityTab, setActivityTab] = useState('meals')
 
   const [showBanner, setShowBanner] = useState(false)
   const [announcements, setAnnouncements] = useState(null)
@@ -306,6 +348,12 @@ export default function DashboardClient({ initialGroups }) {
     setSelectedMemberIds(new Set())
     setShowGroupMenu(false)
     setEditingGroupHeader(false)
+    setGroupDetailTab('members')
+    setGroupMessages([])
+    setMessagesOffset(0)
+    setMessagesHasMore(false)
+    setGroupActivity(null)
+    setActivityTab('meals')
     const [membersResult, detailsResult] = await Promise.all([
       loadMembers(group.id),
       loadGroupDetails(group.id),
@@ -313,6 +361,28 @@ export default function DashboardClient({ initialGroups }) {
     setMembers(membersResult.data || [])
     setGroupDetails(detailsResult.data || null)
     setLoadingMembers(false)
+  }
+
+  async function handleLoadMessages(groupId, offset = 0) {
+    setLoadingMessages(true)
+    const LIMIT = 50
+    const { data, error } = await loadGroupMessagesAction(groupId, { limit: LIMIT + 1, offset })
+    if (error) { showToast('Messages: ' + error, 'error'); setLoadingMessages(false); return }
+    const hasMore = data.length > LIMIT
+    const rows = hasMore ? data.slice(0, LIMIT) : data
+    if (offset === 0) setGroupMessages(rows)
+    else setGroupMessages(prev => [...prev, ...rows])
+    setMessagesOffset(offset + rows.length)
+    setMessagesHasMore(hasMore)
+    setLoadingMessages(false)
+  }
+
+  async function handleLoadActivity(groupId) {
+    setLoadingActivity(true)
+    const { data, error } = await loadGroupActivityAction(groupId)
+    if (error) showToast('Activity: ' + error, 'error')
+    else setGroupActivity(data)
+    setLoadingActivity(false)
   }
 
   async function handleSelectHome() {
@@ -1514,7 +1584,7 @@ export default function DashboardClient({ initialGroups }) {
             </div>
           )}
 
-          {/* — Group member view — */}
+          {/* — Group detail view — */}
           {!showOrphans && !showGlobalSearch && !showBanner && selectedGroup && !loadingMembers && (
             <div className="max-w-6xl mx-auto">
               {/* Group header */}
@@ -1602,125 +1672,312 @@ export default function DashboardClient({ initialGroups }) {
                 )}
               </div>
 
-              {/* Selection action bar */}
-              {selectedMemberIds.size > 0 && (() => {
-                const single = selectedMemberIds.size === 1
-                  ? members.find(m => selectedMemberIds.has(m.id)) ?? null
-                  : null
-                return (
-                  <div className="mb-3 flex items-center gap-2 flex-wrap px-4 py-2.5 bg-jade/5 border border-jade/20 rounded-xl">
-                    <span className="text-sm font-medium text-jade mr-1">
-                      {selectedMemberIds.size} selected
-                    </span>
-                    <button
-                      onClick={() => { setBroadcastGroupName(selectedGroup.name); setBroadcastTarget('selected') }}
-                      className="px-3 py-1 text-xs font-medium rounded-lg bg-jade text-white hover:opacity-90 transition-colors"
-                    >
-                      📣 Broadcast
-                    </button>
-                    {single && (
-                      <>
-                        <button
-                          onClick={() => handleToggleRole(single)}
-                          className="px-3 py-1 text-xs font-medium rounded-lg bg-stone-100 text-stone-600 hover:bg-stone-200 transition-colors"
-                        >
-                          {single.role === 'admin' ? 'Demote' : 'Promote'}
-                        </button>
-                        <button
-                          onClick={() => handlePasswordReset(single)}
-                          className="px-3 py-1 text-xs font-medium rounded-lg bg-stone-100 text-stone-600 hover:bg-stone-200 transition-colors"
-                        >
-                          Reset password
-                        </button>
-                        <button
-                          onClick={() => handleDeleteUser(single)}
-                          className="px-3 py-1 text-xs font-medium rounded-lg bg-red-50 text-red-500 hover:bg-red-100 transition-colors"
-                        >
-                          Delete
-                        </button>
-                      </>
-                    )}
-                    <button
-                      onClick={() => setSelectedMemberIds(new Set())}
-                      className="ml-auto text-xs text-stone-400 hover:text-stone-600 transition-colors"
-                    >
-                      Clear
-                    </button>
-                  </div>
-                )
-              })()}
+              {/* Tab bar */}
+              <div className="flex gap-1 mb-4 border-b border-stone-100 pb-0">
+                {[
+                  { id: 'members',  label: 'Members' },
+                  { id: 'messages', label: 'Messages' },
+                  { id: 'activity', label: 'Activity' },
+                ].map(t => (
+                  <button
+                    key={t.id}
+                    onClick={() => {
+                      setGroupDetailTab(t.id)
+                      if (t.id === 'messages' && groupMessages.length === 0 && !loadingMessages) {
+                        handleLoadMessages(selectedGroup.id, 0)
+                      }
+                      if (t.id === 'activity' && !groupActivity && !loadingActivity) {
+                        handleLoadActivity(selectedGroup.id)
+                      }
+                    }}
+                    className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px ${
+                      groupDetailTab === t.id
+                        ? 'border-stone-800 text-stone-800'
+                        : 'border-transparent text-stone-400 hover:text-stone-600'
+                    }`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
 
-              {displayedMembers.length === 0 ? (
-                <div className="bg-white rounded-2xl border border-stone-100 py-12 text-center text-stone-400">
-                  <p className="text-sm">{search ? 'No matching members' : 'No members in this group'}</p>
-                </div>
-              ) : (
-                <div className="bg-white rounded-2xl border border-stone-200 overflow-x-auto">
-                  <table className="w-full min-w-[900px] text-sm">
-                    <thead>
-                      <tr className="border-b border-stone-100 bg-stone-50">
-                        <th className="px-4 py-3 w-10">
-                          <input
-                            type="checkbox"
-                            checked={displayedMembers.length > 0 && displayedMembers.every(m => selectedMemberIds.has(m.id))}
-                            ref={el => { if (el) el.indeterminate = displayedMembers.some(m => selectedMemberIds.has(m.id)) && !displayedMembers.every(m => selectedMemberIds.has(m.id)) }}
-                            onChange={() => {
-                              const allSelected = displayedMembers.every(m => selectedMemberIds.has(m.id))
-                              setSelectedMemberIds(allSelected ? new Set() : new Set(displayedMembers.map(m => m.id)))
-                            }}
-                            className="rounded border-stone-300 text-jade focus:ring-jade/50 cursor-pointer"
-                          />
-                        </th>
-                        <th className="text-left px-5 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">Name</th>
-                        <th className="text-left px-5 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">Email</th>
-                        <th className="text-left px-5 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">Role</th>
-                        <th className="text-left px-5 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">Last Activity</th>
-                        <th className="text-left px-5 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">Last Logged In</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-stone-50">
-                      {displayedMembers.map(member => (
-                        <tr
-                          key={member.id}
-                          className={`hover:bg-stone-50 transition-colors group ${selectedMemberIds.has(member.id) ? 'bg-jade/5' : ''}`}
+              {/* ── Members tab ── */}
+              {groupDetailTab === 'members' && (
+                <>
+                  {/* Selection action bar */}
+                  {selectedMemberIds.size > 0 && (() => {
+                    const single = selectedMemberIds.size === 1
+                      ? members.find(m => selectedMemberIds.has(m.id)) ?? null
+                      : null
+                    return (
+                      <div className="mb-3 flex items-center gap-2 flex-wrap px-4 py-2.5 bg-jade/5 border border-jade/20 rounded-xl">
+                        <span className="text-sm font-medium text-jade mr-1">
+                          {selectedMemberIds.size} selected
+                        </span>
+                        <button
+                          onClick={() => { setBroadcastGroupName(selectedGroup.name); setBroadcastTarget('selected') }}
+                          className="px-3 py-1 text-xs font-medium rounded-lg bg-jade text-white hover:opacity-90 transition-colors"
                         >
-                          <td className="px-4 py-3">
-                            <input
-                              type="checkbox"
-                              checked={selectedMemberIds.has(member.id)}
-                              onChange={() => toggleSelectMember(member.id)}
-                              className="rounded border-stone-300 text-jade focus:ring-jade/50 cursor-pointer"
-                            />
-                          </td>
-                          <td className="px-5 py-3">
-                            {editingName?.id === member.id && editingName.type === 'user' ? (
+                          📣 Broadcast
+                        </button>
+                        {single && (
+                          <>
+                            <button
+                              onClick={() => handleToggleRole(single)}
+                              className="px-3 py-1 text-xs font-medium rounded-lg bg-stone-100 text-stone-600 hover:bg-stone-200 transition-colors"
+                            >
+                              {single.role === 'admin' ? 'Demote' : 'Promote'}
+                            </button>
+                            <button
+                              onClick={() => handlePasswordReset(single)}
+                              className="px-3 py-1 text-xs font-medium rounded-lg bg-stone-100 text-stone-600 hover:bg-stone-200 transition-colors"
+                            >
+                              Reset password
+                            </button>
+                            <button
+                              onClick={() => handleDeleteUser(single)}
+                              className="px-3 py-1 text-xs font-medium rounded-lg bg-red-50 text-red-500 hover:bg-red-100 transition-colors"
+                            >
+                              Delete
+                            </button>
+                          </>
+                        )}
+                        <button
+                          onClick={() => setSelectedMemberIds(new Set())}
+                          className="ml-auto text-xs text-stone-400 hover:text-stone-600 transition-colors"
+                        >
+                          Clear
+                        </button>
+                      </div>
+                    )
+                  })()}
+
+                  {displayedMembers.length === 0 ? (
+                    <div className="bg-white rounded-2xl border border-stone-100 py-12 text-center text-stone-400">
+                      <p className="text-sm">{search ? 'No matching members' : 'No members in this group'}</p>
+                    </div>
+                  ) : (
+                    <div className="bg-white rounded-2xl border border-stone-200 overflow-x-auto">
+                      <table className="w-full min-w-[900px] text-sm">
+                        <thead>
+                          <tr className="border-b border-stone-100 bg-stone-50">
+                            <th className="px-4 py-3 w-10">
                               <input
-                                autoFocus
-                                value={editingName.value}
-                                onChange={e => setEditingName(n => ({ ...n, value: e.target.value }))}
-                                onKeyDown={e => { if (e.key === 'Enter') submitRename(); if (e.key === 'Escape') setEditingName(null) }}
-                                onBlur={submitRename}
-                                disabled={renaming}
-                                className="text-sm font-medium text-stone-800 border-b border-jade outline-none bg-transparent w-full"
+                                type="checkbox"
+                                checked={displayedMembers.length > 0 && displayedMembers.every(m => selectedMemberIds.has(m.id))}
+                                ref={el => { if (el) el.indeterminate = displayedMembers.some(m => selectedMemberIds.has(m.id)) && !displayedMembers.every(m => selectedMemberIds.has(m.id)) }}
+                                onChange={() => {
+                                  const allSelected = displayedMembers.every(m => selectedMemberIds.has(m.id))
+                                  setSelectedMemberIds(allSelected ? new Set() : new Set(displayedMembers.map(m => m.id)))
+                                }}
+                                className="rounded border-stone-300 text-jade focus:ring-jade/50 cursor-pointer"
                               />
-                            ) : (
-                              <span
-                                className="font-medium text-stone-800 cursor-pointer hover:text-jade transition-colors"
-                                onClick={() => startRename(member.id, member.display_name || '', 'user')}
-                                title="Click to edit name"
-                              >
-                                {member.display_name || <span className="text-stone-400 italic">No name</span>}
+                            </th>
+                            <th className="text-left px-5 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">Name</th>
+                            <th className="text-left px-5 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">Email</th>
+                            <th className="text-left px-5 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">Role</th>
+                            <th className="text-left px-5 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">Last Activity</th>
+                            <th className="text-left px-5 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">Last Logged In</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-stone-50">
+                          {displayedMembers.map(member => (
+                            <tr
+                              key={member.id}
+                              className={`hover:bg-stone-50 transition-colors group ${selectedMemberIds.has(member.id) ? 'bg-jade/5' : ''}`}
+                            >
+                              <td className="px-4 py-3">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedMemberIds.has(member.id)}
+                                  onChange={() => toggleSelectMember(member.id)}
+                                  className="rounded border-stone-300 text-jade focus:ring-jade/50 cursor-pointer"
+                                />
+                              </td>
+                              <td className="px-5 py-3">
+                                {editingName?.id === member.id && editingName.type === 'user' ? (
+                                  <input
+                                    autoFocus
+                                    value={editingName.value}
+                                    onChange={e => setEditingName(n => ({ ...n, value: e.target.value }))}
+                                    onKeyDown={e => { if (e.key === 'Enter') submitRename(); if (e.key === 'Escape') setEditingName(null) }}
+                                    onBlur={submitRename}
+                                    disabled={renaming}
+                                    className="text-sm font-medium text-stone-800 border-b border-jade outline-none bg-transparent w-full"
+                                  />
+                                ) : (
+                                  <span
+                                    className="font-medium text-stone-800 cursor-pointer hover:text-jade transition-colors"
+                                    onClick={() => startRename(member.id, member.display_name || '', 'user')}
+                                    title="Click to edit name"
+                                  >
+                                    {member.display_name || <span className="text-stone-400 italic">No name</span>}
+                                  </span>
+                                )}
+                              </td>
+                              <td className="px-5 py-3 text-stone-500">{member.email || '—'}</td>
+                              <td className="px-5 py-3"><Badge role={member.role} /></td>
+                              <td className="px-5 py-3 text-xs text-stone-400 whitespace-nowrap">{formatTime(member.last_active_at)}</td>
+                              <td className="px-5 py-3 text-xs text-stone-400 whitespace-nowrap">{formatTime(member.last_sign_in_at)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* ── Messages tab ── */}
+              {groupDetailTab === 'messages' && (
+                <div>
+                  {loadingMessages && groupMessages.length === 0 ? (
+                    <div className="flex items-center justify-center py-16 text-stone-400">
+                      <p className="text-sm">Loading messages…</p>
+                    </div>
+                  ) : groupMessages.length === 0 ? (
+                    <div className="bg-white rounded-2xl border border-stone-100 py-12 text-center text-stone-400">
+                      <p className="text-sm">No messages yet</p>
+                    </div>
+                  ) : (
+                    <div className="bg-white rounded-2xl border border-stone-200 overflow-hidden">
+                      <div className="px-5 py-3 border-b border-stone-100 bg-stone-50 flex items-center justify-between">
+                        <p className="text-xs text-stone-500">{groupMessages.length} message{groupMessages.length !== 1 ? 's' : ''} — newest first</p>
+                        <button
+                          onClick={() => handleLoadMessages(selectedGroup.id, 0)}
+                          disabled={loadingMessages}
+                          className="text-xs text-stone-400 hover:text-stone-600 transition-colors disabled:opacity-40"
+                        >
+                          Refresh
+                        </button>
+                      </div>
+                      <div className="divide-y divide-stone-50">
+                        {groupMessages.map((msg, i) => (
+                          <div key={msg.id ?? i} className="px-5 py-3 flex gap-3">
+                            <div className="w-7 h-7 rounded-full bg-stone-100 flex items-center justify-center shrink-0 mt-0.5">
+                              <span className="text-xs font-semibold text-stone-500">
+                                {(msg.profiles?.display_name || '?').charAt(0).toUpperCase()}
                               </span>
-                            )}
-                          </td>
-                          <td className="px-5 py-3 text-stone-500">{member.email || '—'}</td>
-                          <td className="px-5 py-3"><Badge role={member.role} /></td>
-                          <td className="px-5 py-3 text-xs text-stone-400 whitespace-nowrap">{formatTime(member.last_active_at)}</td>
-                          <td className="px-5 py-3 text-xs text-stone-400 whitespace-nowrap">{formatTime(member.last_sign_in_at)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-baseline gap-2 mb-0.5">
+                                <span className="text-xs font-semibold text-stone-700">
+                                  {msg.profiles?.display_name || 'Unknown'}
+                                </span>
+                                <span className="text-xs text-stone-400">{formatTime(msg.created_at)}</span>
+                              </div>
+                              <p className="text-sm text-stone-700 break-words leading-snug">{msg.content}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      {messagesHasMore && (
+                        <div className="px-5 py-3 border-t border-stone-100 text-center">
+                          <button
+                            onClick={() => handleLoadMessages(selectedGroup.id, messagesOffset)}
+                            disabled={loadingMessages}
+                            className="text-xs text-stone-500 hover:text-stone-700 transition-colors disabled:opacity-40"
+                          >
+                            {loadingMessages ? 'Loading…' : 'Load more'}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ── Activity tab ── */}
+              {groupDetailTab === 'activity' && (
+                <div>
+                  {loadingActivity && !groupActivity ? (
+                    <div className="flex items-center justify-center py-16 text-stone-400">
+                      <p className="text-sm">Loading activity…</p>
+                    </div>
+                  ) : groupActivity ? (
+                    <>
+                      {/* Activity sub-tabs */}
+                      <div className="flex gap-1 mb-4">
+                        {[
+                          { id: 'meals',     label: `Meals (${groupActivity.meals.length})` },
+                          { id: 'services',  label: `Services (${groupActivity.services.length})` },
+                          { id: 'birthdays', label: `Birthdays (${groupActivity.birthdays.length})` },
+                          { id: 'prayers',   label: `Prayer (${groupActivity.prayers.length})` },
+                        ].map(t => (
+                          <button
+                            key={t.id}
+                            onClick={() => setActivityTab(t.id)}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${activityTab === t.id ? 'bg-stone-800 text-white' : 'text-stone-400 hover:text-stone-600 border border-stone-200'}`}
+                          >
+                            {t.label}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Meals */}
+                      {activityTab === 'meals' && (
+                        <ActivityList
+                          items={groupActivity.meals}
+                          empty="No meals recorded"
+                          renderRow={row => ({
+                            title: row.title ?? row.name ?? row.meal_name ?? '(untitled)',
+                            subtitle: [row.date ?? row.meal_date, row.location].filter(Boolean).join(' · '),
+                            body: row.description ?? row.notes ?? null,
+                            date: row.created_at,
+                          })}
+                        />
+                      )}
+
+                      {/* Services */}
+                      {activityTab === 'services' && (
+                        <ActivityList
+                          items={groupActivity.services}
+                          empty="No services recorded"
+                          renderRow={row => ({
+                            title: row.title ?? row.name ?? row.service_name ?? '(untitled)',
+                            subtitle: [row.date ?? row.service_date, row.location].filter(Boolean).join(' · '),
+                            body: row.description ?? row.notes ?? null,
+                            date: row.created_at,
+                          })}
+                        />
+                      )}
+
+                      {/* Birthdays */}
+                      {activityTab === 'birthdays' && (
+                        <ActivityList
+                          items={groupActivity.birthdays}
+                          empty="No birthdays recorded"
+                          renderRow={row => ({
+                            title: row.name ?? row.person_name ?? row.display_name ?? '(untitled)',
+                            subtitle: row.date ?? row.birthday ?? row.birthday_date ?? null,
+                            body: null,
+                            date: row.created_at,
+                          })}
+                        />
+                      )}
+
+                      {/* Prayer requests */}
+                      {activityTab === 'prayers' && (
+                        groupActivity.prayerError ? (
+                          <div className="bg-white rounded-2xl border border-stone-100 py-12 text-center text-stone-400">
+                            <p className="text-sm">Prayer requests unavailable</p>
+                            <p className="text-xs mt-1 text-stone-300">{groupActivity.prayerError}</p>
+                          </div>
+                        ) : (
+                          <ActivityList
+                            items={groupActivity.prayers}
+                            empty="No prayer requests"
+                            renderRow={row => ({
+                              title: row.profiles?.display_name ?? row.author ?? 'Unknown',
+                              subtitle: null,
+                              body: row.content ?? row.body ?? row.text ?? row.request ?? null,
+                              date: row.created_at,
+                            })}
+                          />
+                        )
+                      )}
+                    </>
+                  ) : null}
                 </div>
               )}
             </div>

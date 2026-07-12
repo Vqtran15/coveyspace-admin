@@ -439,3 +439,35 @@ export async function loadAuditLog() {
   if (error) return { error: error.message, data: [] }
   return { data: data ?? [] }
 }
+
+export async function loadGroupMessagesAction(groupId, { limit = 50, offset = 0 } = {}) {
+  await requireAuth()
+  const { data, error } = await getSupabase()
+    .from('messages')
+    .select('id, content, user_id, created_at, profiles(display_name)')
+    .eq('community_group_id', groupId)
+    .order('created_at', { ascending: false })
+    .range(offset, offset + limit - 1)
+  if (error) return { error: error.message }
+  return { data: data ?? [] }
+}
+
+export async function loadGroupActivityAction(groupId) {
+  await requireAuth()
+  const sb = getSupabase()
+  const [mealsRes, servicesRes, birthdaysRes, prayerRes] = await Promise.all([
+    sb.from('meal_pages').select('*').eq('community_group_id', groupId).order('created_at', { ascending: false }).limit(50),
+    sb.from('serving_pages').select('*').eq('community_group_id', groupId).order('created_at', { ascending: false }).limit(50),
+    sb.from('birthdays').select('*').eq('community_group_id', groupId).order('created_at', { ascending: false }).limit(50),
+    sb.from('prayer_requests').select('*, profiles(display_name)').eq('community_group_id', groupId).order('created_at', { ascending: false }).limit(50),
+  ])
+  return {
+    data: {
+      meals:    mealsRes.data    ?? [],
+      services: servicesRes.data ?? [],
+      birthdays: birthdaysRes.data ?? [],
+      prayers:  prayerRes.error ? [] : (prayerRes.data ?? []),
+      prayerError: prayerRes.error?.message ?? null,
+    },
+  }
+}
