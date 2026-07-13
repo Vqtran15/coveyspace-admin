@@ -1,6 +1,6 @@
 'use server'
 
-import { createSession, destroySession } from '@/lib/session'
+import { createSession, destroySession, createPendingOtp, verifyAndConsumePendingOtp, clearPendingOtp } from '@/lib/session'
 import { checkRateLimit, recordFailedAttempt, clearAttempts } from '@/lib/rateLimit'
 import { logAudit } from '@/lib/audit'
 import { headers } from 'next/headers'
@@ -11,6 +11,35 @@ function getIp() {
   return h.get('x-forwarded-for')?.split(',')[0]?.trim()
     || h.get('x-real-ip')
     || 'unknown'
+}
+
+function generateCode() {
+  return String(Math.floor(100000 + Math.random() * 900000))
+}
+
+async function sendOtpEmail(code) {
+  await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
+    },
+    body: JSON.stringify({
+      from: 'Covey Space Admin <hello@coveyspace.com>',
+      to: [process.env.ADMIN_EMAIL],
+      subject: `Your login code: ${code}`,
+      html: `
+        <div style="font-family:sans-serif;max-width:400px;margin:0 auto;padding:24px">
+          <h2 style="margin:0 0 8px;font-size:18px;color:#1c1917">Covey Space Admin</h2>
+          <p style="margin:0 0 24px;color:#78716c;font-size:14px">Your verification code is:</p>
+          <div style="background:#f5f5f4;border-radius:12px;padding:20px;text-align:center;letter-spacing:8px;font-size:32px;font-weight:700;color:#1c1917">
+            ${code}
+          </div>
+          <p style="margin:16px 0 0;color:#a8a29e;font-size:12px">This code expires in 10 minutes. If you didn't request this, ignore this email.</p>
+        </div>
+      `,
+    }),
+  })
 }
 
 export async function loginAction(email, password) {
@@ -31,9 +60,29 @@ export async function loginAction(email, password) {
   }
 
   await clearAttempts(ip)
+
+  const code = generateCode()
+  await createPendingOtp(code)
+  await sendOtpEmail(code)
+
+  redirect('/login/verify')
+}
+
+export async function verifyOtpAction(code) {
+  const ip = getIp()
+  const result = await verifyAndConsumePendingOtp(code)
+  if (result.error) return { error: result.error }
   await createSession()
   await logAudit({ action: 'login', ip })
   redirect('/dashboard')
+}
+
+export async function resendOtpAction() {
+  clearPendingOtp()
+  const code = generateCode()
+  await createPendingOtp(code)
+  await sendOtpEmail(code)
+  return { ok: true }
 }
 
 export async function logoutAction() {
