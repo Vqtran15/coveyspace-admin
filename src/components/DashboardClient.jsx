@@ -26,6 +26,7 @@ import {
   loadMetricsAction,
   loadGroupMessagesAction,
   loadGroupActivityAction,
+  loadGroupBroadcastHistoryAction,
 } from '@/actions/admin'
 import AdminNav from '@/components/AdminNav'
 import { loadGA4MetricsAction } from '@/actions/analytics'
@@ -302,6 +303,8 @@ export default function DashboardClient({ initialGroups }) {
   const [groupActivity, setGroupActivity] = useState(null)
   const [loadingActivity, setLoadingActivity] = useState(false)
   const [activityTab, setActivityTab] = useState('meals')
+  const [groupBroadcasts, setGroupBroadcasts] = useState([])
+  const [loadingBroadcasts, setLoadingBroadcasts] = useState(false)
 
   const [showBanner, setShowBanner] = useState(false)
   const [announcements, setAnnouncements] = useState(null)
@@ -396,6 +399,8 @@ export default function DashboardClient({ initialGroups }) {
     setMessagesHasMore(false)
     setGroupActivity(null)
     setActivityTab('meals')
+    setGroupBroadcasts([])
+    setLoadingBroadcasts(false)
     const [membersResult, detailsResult] = await Promise.all([
       loadMembers(group.id),
       loadGroupDetails(group.id),
@@ -1760,9 +1765,10 @@ export default function DashboardClient({ initialGroups }) {
               {/* Tab bar */}
               <div className="flex gap-1 mb-4 border-b border-stone-100 pb-0">
                 {[
-                  { id: 'members',  label: 'Members' },
-                  { id: 'messages', label: 'Messages' },
-                  { id: 'activity', label: 'Activity' },
+                  { id: 'members',    label: 'Members' },
+                  { id: 'messages',   label: 'Messages' },
+                  { id: 'activity',   label: 'Activity' },
+                  { id: 'broadcasts', label: 'Broadcasts' },
                 ].map(t => (
                   <button
                     key={t.id}
@@ -1773,6 +1779,13 @@ export default function DashboardClient({ initialGroups }) {
                       }
                       if (t.id === 'activity' && !groupActivity && !loadingActivity) {
                         handleLoadActivity(selectedGroup.id)
+                      }
+                      if (t.id === 'broadcasts' && groupBroadcasts.length === 0 && !loadingBroadcasts) {
+                        setLoadingBroadcasts(true)
+                        loadGroupBroadcastHistoryAction(selectedGroup.id).then(r => {
+                          setGroupBroadcasts(r.data ?? [])
+                          setLoadingBroadcasts(false)
+                        })
                       }
                     }}
                     className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px ${
@@ -2078,6 +2091,44 @@ export default function DashboardClient({ initialGroups }) {
                       )}
                     </>
                   ) : null}
+                </div>
+              )}
+              {/* ── Broadcasts tab ── */}
+              {groupDetailTab === 'broadcasts' && (
+                <div>
+                  {loadingBroadcasts ? (
+                    <div className="py-12 text-center text-stone-300 text-sm">Loading…</div>
+                  ) : groupBroadcasts.length === 0 ? (
+                    <div className="bg-white rounded-2xl border border-stone-100 py-12 text-center text-stone-400">
+                      <p className="text-sm">No broadcasts sent to this group yet</p>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-3">
+                      {groupBroadcasts.map(entry => (
+                        <div key={entry.id} className="bg-white rounded-2xl border border-stone-200 px-5 py-4">
+                          <p className="text-sm text-stone-800 leading-snug">{entry.target_label}</p>
+                          <div className="flex items-center gap-3 mt-2">
+                            <span className="text-xs text-stone-400">
+                              {new Date(entry.performed_at).toLocaleString('en-US', {
+                                month: 'short', day: 'numeric', year: 'numeric',
+                                hour: '2-digit', minute: '2-digit',
+                                timeZone: 'America/Los_Angeles',
+                              })}
+                            </span>
+                            {entry.metadata?.sent != null && (
+                              <>
+                                <span className="text-stone-200">·</span>
+                                <span className="text-xs text-stone-500">
+                                  {entry.metadata.sent} delivered
+                                  {entry.metadata.stale > 0 && `, ${entry.metadata.stale} stale`}
+                                </span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
