@@ -1721,12 +1721,6 @@ export default function DashboardClient({ initialGroups }) {
                         <div className="fixed inset-0 z-10" onClick={() => setShowGroupMenu(false)} />
                         <div className={`absolute right-0 top-full mt-1 z-20 w-48 bg-white rounded-xl shadow-xl border border-stone-100 py-1 overflow-hidden ${groupMenuAnim.closing ? 'anim-menu-out' : 'anim-menu-in'}`}>
                           <button
-                            onClick={() => { setShowGroupMenu(false); setGroupNameDraft(selectedGroup.name); setEditingGroupHeader(true) }}
-                            className="w-full text-left px-4 py-2.5 text-sm text-stone-700 hover:bg-stone-50 transition-colors"
-                          >
-                            Rename group
-                          </button>
-                          <button
                             onClick={() => { setShowGroupMenu(false); setBroadcastGroupName(selectedGroup.name); setBroadcastTarget(selectedGroup.id) }}
                             className="w-full text-left px-4 py-2.5 text-sm text-stone-700 hover:bg-stone-50 transition-colors"
                           >
@@ -1738,6 +1732,12 @@ export default function DashboardClient({ initialGroups }) {
                             className="w-full text-left px-4 py-2.5 text-sm text-stone-700 hover:bg-stone-50 transition-colors disabled:opacity-40"
                           >
                             Export CSV
+                          </button>
+                          <button
+                            onClick={() => { setShowGroupMenu(false); setGroupNameDraft(selectedGroup.name); setEditingGroupHeader(true) }}
+                            className="w-full text-left px-4 py-2.5 text-sm text-stone-700 hover:bg-stone-50 transition-colors"
+                          >
+                            Rename group
                           </button>
                           <div className="border-t border-stone-100 mt-1 pt-1">
                             <button
