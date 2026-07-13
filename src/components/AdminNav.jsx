@@ -14,6 +14,7 @@ import {
   CaretLeft,
   CaretRight,
   SignOut,
+  MagnifyingGlass,
 } from '@phosphor-icons/react'
 import { logoutAction } from '@/actions/auth'
 
@@ -50,6 +51,7 @@ export default function AdminNav({
   onGroups,
   onOrphans,
   onBanner,
+  onSearch,
   orphanCount = 0,
   activeView = 'overview',
 }) {
@@ -72,6 +74,7 @@ export default function AdminNav({
     if (view === 'audit') return pathname === '/audit'
     if (view === 'errors') return pathname === '/errors'
     if (view === 'broadcast') return pathname === '/broadcast'
+    if (view === 'search') return pathname === '/dashboard' && activeView === 'search'
     return pathname === '/dashboard' && activeView === view
   }
 
@@ -109,6 +112,15 @@ export default function AdminNav({
           label="Overview"
           sublabel="Metrics and activity"
           active={isActive('overview')}
+          collapsed={collapsed}
+        />
+        <NavItem
+          onClick={onSearch}
+          href="/dashboard?view=search"
+          icon={MagnifyingGlass}
+          label="Search"
+          sublabel="Find users globally"
+          active={isActive('search')}
           collapsed={collapsed}
         />
         <NavItem

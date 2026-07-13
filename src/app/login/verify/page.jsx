@@ -42,7 +42,12 @@ export default function VerifyPage() {
     setResending(true)
     setError(null)
     setCode('')
-    await resendOtpAction()
+    const result = await resendOtpAction()
+    if (result?.error) {
+      setError(result.error)
+      setResending(false)
+      return
+    }
     setResent(true)
     setResending(false)
     setCooldown(30)

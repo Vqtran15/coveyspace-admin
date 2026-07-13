@@ -802,8 +802,9 @@ export default function DashboardClient({ initialGroups }) {
         onGroups={handleSelectGroups}
         onOrphans={handleSelectOrphans}
         onBanner={handleSelectBanner}
+        onSearch={handleSelectGlobalSearch}
         orphanCount={orphanedUsers?.length ?? 0}
-        activeView={showGroups ? 'groups' : showOrphans ? 'orphans' : showBanner ? 'banner' : 'overview'}
+        activeView={showGroups ? 'groups' : showOrphans ? 'orphans' : showBanner ? 'banner' : showGlobalSearch ? 'search' : 'overview'}
       />
 
       {/* Main content column */}
@@ -837,16 +838,6 @@ export default function DashboardClient({ initialGroups }) {
           </>
         )}
         </div>
-        <button
-          onClick={handleSelectGlobalSearch}
-          className={`p-1.5 rounded-lg transition-colors shrink-0 ${showGlobalSearch ? 'text-stone-800 bg-stone-100' : 'text-stone-400 hover:text-stone-700 hover:bg-stone-100'}`}
-          aria-label="Global search"
-        >
-          <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-            <circle cx="8.5" cy="8.5" r="5.5"/>
-            <line x1="13" y1="13" x2="18" y2="18"/>
-          </svg>
-        </button>
       </div>
 
       <div className="flex flex-1 overflow-hidden">
@@ -1729,7 +1720,7 @@ export default function DashboardClient({ initialGroups }) {
                             onClick={() => { setShowGroupMenu(false); setBroadcastGroupName(selectedGroup.name); setBroadcastTarget(selectedGroup.id) }}
                             className="w-full text-left px-4 py-2.5 text-sm text-stone-700 hover:bg-stone-50 transition-colors"
                           >
-                            <Megaphone size={14} className="inline mr-1.5 -mt-0.5" />Broadcast to this group
+                            <Megaphone size={14} className="inline mr-1.5 -mt-0.5" />Broadcast
                           </button>
                           <button
                             onClick={() => { setShowGroupMenu(false); exportCSV(selectedGroup.name, members) }}
@@ -1782,10 +1773,10 @@ export default function DashboardClient({ initialGroups }) {
                       }
                       if (t.id === 'broadcasts' && groupBroadcasts.length === 0 && !loadingBroadcasts) {
                         setLoadingBroadcasts(true)
-                        loadGroupBroadcastHistoryAction(selectedGroup.id).then(r => {
-                          setGroupBroadcasts(r.data ?? [])
-                          setLoadingBroadcasts(false)
-                        })
+                        loadGroupBroadcastHistoryAction(selectedGroup.id)
+                          .then(r => setGroupBroadcasts(r.data ?? []))
+                          .catch(() => setGroupBroadcasts([]))
+                          .finally(() => setLoadingBroadcasts(false))
                       }
                     }}
                     className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px ${

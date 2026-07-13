@@ -18,7 +18,7 @@ function generateCode() {
 }
 
 async function sendOtpEmail(code) {
-  await fetch('https://api.resend.com/emails', {
+  const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -40,6 +40,10 @@ async function sendOtpEmail(code) {
       `,
     }),
   })
+  if (!res.ok) {
+    const body = await res.text().catch(() => '')
+    throw new Error(`Failed to send verification email (${res.status}): ${body}`)
+  }
 }
 
 export async function loginAction(email, password) {
@@ -62,8 +66,12 @@ export async function loginAction(email, password) {
   await clearAttempts(ip)
 
   const code = generateCode()
+  try {
+    await sendOtpEmail(code)
+  } catch (e) {
+    return { error: 'Could not send verification email. Please try again.' }
+  }
   await createPendingOtp(code)
-  await sendOtpEmail(code)
 
   redirect('/login/verify')
 }
@@ -78,10 +86,14 @@ export async function verifyOtpAction(code) {
 }
 
 export async function resendOtpAction() {
-  clearPendingOtp()
   const code = generateCode()
+  try {
+    await sendOtpEmail(code)
+  } catch (e) {
+    return { error: 'Could not send verification email. Please try again.' }
+  }
+  clearPendingOtp()
   await createPendingOtp(code)
-  await sendOtpEmail(code)
   return { ok: true }
 }
 
