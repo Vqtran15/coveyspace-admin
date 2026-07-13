@@ -1730,7 +1730,7 @@ export default function DashboardClient({ initialGroups }) {
                             onClick={() => { setShowGroupMenu(false); setBroadcastGroupName(selectedGroup.name); setBroadcastTarget(selectedGroup.id) }}
                             className="w-full text-left px-4 py-2.5 text-sm text-stone-700 hover:bg-stone-50 transition-colors"
                           >
-                            <Megaphone size={14} className="inline mr-1.5 -mt-0.5" />Broadcast to all
+                            <Megaphone size={14} className="inline mr-1.5 -mt-0.5" />Broadcast to this group
                           </button>
                           <button
                             onClick={() => { setShowGroupMenu(false); exportCSV(selectedGroup.name, members) }}
