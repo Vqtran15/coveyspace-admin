@@ -32,6 +32,7 @@ function getMessage(entry) {
 
 export default function BroadcastClient({ initialHistory }) {
   const [history, setHistory] = useState(initialHistory)
+  const [title, setTitle] = useState('')
   const [draft, setDraft] = useState('')
   const [error, setError] = useState(null)
   const [isPending, startTransition] = useTransition()
@@ -40,13 +41,18 @@ export default function BroadcastClient({ initialHistory }) {
     if (!draft.trim()) return
     startTransition(async () => {
       setError(null)
-      const r = await broadcastPushAction({ body: draft.trim() })
+      const r = await broadcastPushAction({ title: title.trim() || undefined, body: draft.trim() })
       if (r.error) { setError(r.error); return }
+      setTitle('')
       setDraft('')
       const result = await loadBroadcastHistoryAction()
       if (!result.error) setHistory(result.data)
     })
   }
+
+  const titleLen = title.trim().length
+  const bodyLen = draft.trim().length
+  const canSend = bodyLen > 0 && bodyLen <= 200 && titleLen <= 50 && !isPending
 
   return (
     <div className="h-full flex flex-col bg-sunrise-50">
@@ -60,20 +66,38 @@ export default function BroadcastClient({ initialHistory }) {
 
           {/* Compose */}
           <div>
-            <div className="bg-white rounded-2xl border border-stone-200 p-5">
-              <label className="block text-xs font-semibold text-stone-500 uppercase tracking-wider mb-2">Message</label>
-              <textarea
-                value={draft}
-                onChange={e => setDraft(e.target.value)}
-                placeholder="e.g. Reminder: this week's meetup is at 7 PM — see you there!"
-                rows={4}
-                className="w-full text-sm text-stone-800 border border-stone-200 rounded-xl px-3 py-2.5 resize-none outline-none focus:border-jade transition-colors"
-              />
-              <div className="flex items-center justify-between mt-3">
-                <span className="text-xs text-stone-400">{draft.trim().length}/200 characters</span>
+            <div className="bg-white rounded-2xl border border-stone-200 p-5 space-y-4">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-xs font-semibold text-stone-500 uppercase tracking-wider">Title</label>
+                  <span className={`text-xs ${titleLen > 50 ? 'text-red-500' : 'text-stone-400'}`}>{titleLen}/50</span>
+                </div>
+                <input
+                  type="text"
+                  value={title}
+                  onChange={e => setTitle(e.target.value)}
+                  placeholder="e.g. What's New"
+                  className="w-full text-sm text-stone-800 border border-stone-200 rounded-xl px-3 py-2.5 outline-none focus:border-jade transition-colors"
+                />
+                <p className="text-xs text-stone-400 mt-1">Optional — defaults to "Covey Space" if left blank</p>
+              </div>
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-xs font-semibold text-stone-500 uppercase tracking-wider">Message</label>
+                  <span className={`text-xs ${bodyLen > 200 ? 'text-red-500' : 'text-stone-400'}`}>{bodyLen}/200</span>
+                </div>
+                <textarea
+                  value={draft}
+                  onChange={e => setDraft(e.target.value)}
+                  placeholder="e.g. Reminder: this week's meetup is at 7 PM — see you there!"
+                  rows={4}
+                  className="w-full text-sm text-stone-800 border border-stone-200 rounded-xl px-3 py-2.5 resize-none outline-none focus:border-jade transition-colors"
+                />
+              </div>
+              <div className="flex justify-end">
                 <button
                   onClick={handleSend}
-                  disabled={!draft.trim() || draft.trim().length > 200 || isPending}
+                  disabled={!canSend}
                   className="px-4 py-2 text-sm font-semibold bg-jade text-white rounded-xl hover:opacity-90 transition-colors disabled:opacity-40"
                 >
                   {isPending ? 'Sending…' : 'Send Push'}
@@ -96,6 +120,9 @@ export default function BroadcastClient({ initialHistory }) {
               <div className="flex flex-col gap-3">
                 {history.map(entry => (
                   <div key={entry.id} className="bg-white rounded-2xl border border-stone-200 px-5 py-4">
+                    {entry.metadata?.title && (
+                      <p className="text-xs font-semibold text-stone-500 mb-0.5">{entry.metadata.title}</p>
+                    )}
                     <p className="text-sm text-stone-800 leading-snug">{getMessage(entry)}</p>
                     <div className="flex items-center gap-3 mt-2">
                       <span className="text-xs text-stone-400">{formatTime(entry.performed_at)}</span>

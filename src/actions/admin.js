@@ -391,8 +391,8 @@ export async function deactivateAnnouncementAction(id) {
   return { success: true }
 }
 
-export async function broadcastPushAction({ groupId, userIds, body }) {
-  const title = 'Covey Space'
+export async function broadcastPushAction({ groupId, userIds, title: rawTitle, body }) {
+  const title = rawTitle?.trim() || 'Covey Space'
   await requireAuth()
   const ip = getIp()
   try {
@@ -418,7 +418,7 @@ export async function broadcastPushAction({ groupId, userIds, body }) {
         : groupId
         ? body.slice(0, 80)
         : `[All] ${body.slice(0, 80)}`,
-      metadata: { sent: result.sent, stale: result.stale },
+      metadata: { title: rawTitle?.trim() || null, sent: result.sent, stale: result.stale },
       ip,
     })
     return { success: true, sent: result.sent ?? 0 }
