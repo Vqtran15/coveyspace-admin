@@ -2,34 +2,13 @@
 
 import { useState, useTransition } from 'react'
 import { loadClientErrorsAction, resolveErrorAction, resolveAllErrorsAction } from '@/actions/admin'
+import { formatTime, timeAgo } from '@/lib/format'
 
-const PT = 'America/Los_Angeles'
+const PAGE_SIZE = 50
 
-function formatTime(iso) {
-  if (!iso) return '—'
-  return new Date(iso).toLocaleString('en-US', {
-    month: 'short', day: 'numeric', year: 'numeric',
-    hour: '2-digit', minute: '2-digit',
-    timeZone: PT,
-  })
-}
-
-function timeAgo(iso) {
-  if (!iso) return '—'
-  const ms = Date.now() - new Date(iso).getTime()
-  const m = Math.floor(ms / 60000)
-  if (m < 2) return 'just now'
-  if (m < 60) return `${m}m ago`
-  const h = Math.floor(m / 60)
-  if (h < 24) return `${h}h ago`
-  const d = Math.floor(h / 24)
-  if (d < 30) return `${d}d ago`
-  const mo = Math.floor(d / 30)
-  return `${mo}mo ago`
-}
-
-export default function ErrorsClient({ initialErrors, initialError }) {
+export default function ErrorsClient({ initialErrors, initialTotal, initialError }) {
   const [errors, setErrors] = useState(initialErrors)
+  const [total, setTotal]   = useState(initialTotal ?? initialErrors.length)
   const [fetchError, setFetchError] = useState(initialError)
   const [showResolved, setShowResolved] = useState(false)
   const [expandedId, setExpandedId] = useState(null)
@@ -38,23 +17,24 @@ export default function ErrorsClient({ initialErrors, initialError }) {
   const now = Date.now()
   const last24h = new Date(now - 86400000).toISOString()
 
-  const uniqueMessages = new Set(errors.map(e => e.error_message)).size
-  const affectedUsers  = new Set(errors.map(e => e.user_id).filter(Boolean)).size
-  const recentCount    = errors.filter(e => e.created_at >= last24h).length
+  const openErrors     = errors.filter(e => !e.resolved_at)
+  const uniqueMessages = new Set(openErrors.map(e => e.error_message)).size
+  const affectedUsers  = new Set(openErrors.map(e => e.user_id).filter(Boolean)).size
+  const recentCount    = openErrors.filter(e => e.created_at >= last24h).length
 
   function handleResolve(id) {
-    // When showing resolved, mark in place; otherwise remove from list
     if (showResolved) {
       setErrors(prev => prev.map(e => e.id === id ? { ...e, resolved_at: new Date().toISOString() } : e))
     } else {
       setErrors(prev => prev.filter(e => e.id !== id))
+      setTotal(t => Math.max(0, t - 1))
     }
     startTransition(async () => {
       const res = await resolveErrorAction(id)
       if (res.error) {
         setFetchError(res.error)
         const result = await loadClientErrorsAction({ includeResolved: showResolved })
-        if (!result.error) setErrors(result.data)
+        if (!result.error) { setErrors(result.data); setTotal(result.total) }
       }
     })
   }
@@ -64,7 +44,7 @@ export default function ErrorsClient({ initialErrors, initialError }) {
       const res = await resolveAllErrorsAction()
       if (res.error) { setFetchError(res.error); return }
       const result = await loadClientErrorsAction({ includeResolved: showResolved })
-      if (!result.error) setErrors(result.data)
+      if (!result.error) { setErrors(result.data); setTotal(result.total) }
     })
   }
 
@@ -75,6 +55,15 @@ export default function ErrorsClient({ initialErrors, initialError }) {
       const result = await loadClientErrorsAction({ includeResolved: next })
       if (result.error) { setFetchError(result.error); return }
       setErrors(result.data)
+      setTotal(result.total)
+    })
+  }
+
+  function handleLoadMore() {
+    startTransition(async () => {
+      const result = await loadClientErrorsAction({ offset: errors.length, includeResolved: showResolved })
+      if (result.error) { setFetchError(result.error); return }
+      setErrors(prev => [...prev, ...result.data])
     })
   }
 
@@ -83,7 +72,7 @@ export default function ErrorsClient({ initialErrors, initialError }) {
       <div className="bg-white border-b border-stone-100 px-6 py-4 shrink-0">
         <h1 className="text-base font-semibold text-stone-800">Error Monitor</h1>
         <p className="text-xs text-stone-400 mt-0.5">
-          {showResolved ? 'All errors (including resolved)' : `${errors.length} open error${errors.length !== 1 ? 's' : ''}`}
+          {showResolved ? `${total} total error${total !== 1 ? 's' : ''}` : `${total} open error${total !== 1 ? 's' : ''}`}
         </p>
       </div>
 
@@ -221,6 +210,18 @@ export default function ErrorsClient({ initialErrors, initialError }) {
                   </div>
                 )
               })}
+            </div>
+          )}
+
+          {errors.length < total && (
+            <div className="flex justify-center pt-2">
+              <button
+                onClick={handleLoadMore}
+                disabled={isPending}
+                className="text-sm font-medium text-stone-500 hover:text-stone-800 border border-stone-200 hover:border-stone-400 rounded-xl px-5 py-2 transition-colors disabled:opacity-40"
+              >
+                {isPending ? 'Loading…' : `Load more (${total - errors.length} remaining)`}
+              </button>
             </div>
           )}
         </div>

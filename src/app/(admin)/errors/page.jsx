@@ -5,5 +5,5 @@ import ErrorsClient from '@/components/ErrorsClient'
 export default async function ErrorsPage() {
   await requireAuth()
   const result = await loadClientErrorsAction()
-  return <ErrorsClient initialErrors={result.data ?? []} initialError={result.error ?? null} />
+  return <ErrorsClient initialErrors={result.data ?? []} initialTotal={result.total ?? 0} initialError={result.error ?? null} />
 }

@@ -10,6 +10,19 @@ function getIp() {
   return h.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
 }
 
+async function listAllUsers(sb) {
+  const users = []
+  let page = 1
+  while (true) {
+    const { data, error } = await sb.auth.admin.listUsers({ page, perPage: 1000 })
+    if (error) return { users: null, error }
+    users.push(...(data.users ?? []))
+    if (!data.nextPage) break
+    page = data.nextPage
+  }
+  return { users, error: null }
+}
+
 export async function loadGroups() {
   await requireAuth()
   const { data, error } = await getSupabase()
@@ -29,13 +42,13 @@ export async function loadGroups() {
 export async function loadMembers(groupId) {
   await requireAuth()
   const sb = getSupabase()
-  const [{ data: profiles, error: pErr }, { data: authData, error: aErr }] = await Promise.all([
+  const [{ data: profiles, error: pErr }, { users: authUsers, error: aErr }] = await Promise.all([
     sb.from('profiles').select('*').eq('community_group_id', groupId).order('created_at'),
-    sb.auth.admin.listUsers({ perPage: 1000 }),
+    listAllUsers(sb),
   ])
   if (pErr || aErr) return { error: (pErr || aErr).message }
 
-  const authMap = Object.fromEntries((authData?.users ?? []).map(u => [u.id, u]))
+  const authMap = Object.fromEntries((authUsers ?? []).map(u => [u.id, u]))
   const userIds = (profiles ?? []).map(p => p.user_id)
 
   const { data: sessionData } = await sb.rpc('admin_get_last_session', { user_ids: userIds })
@@ -161,7 +174,7 @@ export async function loadGroupDetails(groupId) {
   const [{ data: group, error: gErr }, { data: settings }] = await Promise.all([
     sb.from('community_groups').select('invite_code').eq('id', groupId).single(),
     sb.from('group_settings')
-      .select('meals_enabled, services_enabled, chat_enabled, prayer_enabled, birthdays_enabled, guide_enabled')
+      .select('meals_enabled, services_enabled, chat_enabled, prayer_enabled, birthdays_enabled, guide_enabled, giving_enabled')
       .eq('group_id', groupId)
       .maybeSingle(),
   ])
@@ -180,14 +193,14 @@ export async function searchUsersGlobalAction(query) {
   const q = query.trim().toLowerCase()
   if (!q) return { data: [] }
 
-  const [{ data: authData, error: aErr }, { data: profiles, error: pErr }, { data: groups }] = await Promise.all([
-    sb.auth.admin.listUsers({ perPage: 1000 }),
+  const [{ users: authUsers, error: aErr }, { data: profiles, error: pErr }, { data: groups }] = await Promise.all([
+    listAllUsers(sb),
     sb.from('profiles').select('user_id, display_name, role, community_group_id, created_at'),
     sb.from('community_groups').select('id, name'),
   ])
   if (aErr || pErr) return { error: (aErr || pErr).message }
 
-  const authMap = Object.fromEntries((authData?.users ?? []).map(u => [u.id, u]))
+  const authMap = Object.fromEntries((authUsers ?? []).map(u => [u.id, u]))
   const groupMap = Object.fromEntries((groups ?? []).map(g => [g.id, g.name]))
 
   const results = (profiles ?? [])
@@ -297,7 +310,7 @@ export async function loadMetricsAction({ periodStart, periodEnd } = {}) {
     { data: groupsWithMembers },
     { data: convData },
     { data: profilesData },
-    { data: authData },
+    { users: allAuthUsers },
   ] = await Promise.all([
     sb.from('community_groups').select('*', { count: 'exact', head: true }),
     sb.from('profiles').select('*', { count: 'exact', head: true }),
@@ -307,7 +320,7 @@ export async function loadMetricsAction({ periodStart, periodEnd } = {}) {
     sb.from('community_groups').select('id, name, created_at, profiles(count)').order('created_at', { ascending: false }),
     sb.from('conversations').select('community_group_id, updated_at, messages(count)'),
     sb.from('profiles').select('user_id, community_group_id'),
-    sb.auth.admin.listUsers({ perPage: 1000 }),
+    listAllUsers(sb),
   ])
 
   // Build per-group stats keyed by group id
@@ -328,7 +341,7 @@ export async function loadMetricsAction({ periodStart, periodEnd } = {}) {
     if (!s.lastActivity || conv.updated_at > s.lastActivity) s.lastActivity = conv.updated_at
   }
   const userGroupMap = Object.fromEntries((profilesData ?? []).map(p => [p.user_id, p.community_group_id]))
-  for (const user of authData?.users ?? []) {
+  for (const user of allAuthUsers ?? []) {
     const s = statsMap[userGroupMap[user.id]]
     if (!s || !user.last_sign_in_at) continue
     if (!s.lastLogin || user.last_sign_in_at > s.lastLogin) s.lastLogin = user.last_sign_in_at
@@ -417,13 +430,13 @@ export async function broadcastPushAction({ groupId, userIds, body }) {
 export async function loadOrphanedUsers() {
   await requireAuth()
   const sb = getSupabase()
-  const [{ data: authData, error: aErr }, { data: profiles, error: pErr }] = await Promise.all([
-    sb.auth.admin.listUsers({ perPage: 1000 }),
+  const [{ users: authUsers, error: aErr }, { data: profiles, error: pErr }] = await Promise.all([
+    listAllUsers(sb),
     sb.from('profiles').select('user_id'),
   ])
   if (aErr || pErr) return { error: (aErr || pErr).message }
   const profileSet = new Set((profiles ?? []).map(p => p.user_id))
-  const orphans = (authData?.users ?? [])
+  const orphans = (authUsers ?? [])
     .filter(u => !profileSet.has(u.id))
     .map(u => ({ id: u.id, email: u.email, created_at: u.created_at, last_sign_in_at: u.last_sign_in_at }))
     .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
@@ -480,18 +493,18 @@ export async function loadGroupMessagesAction(groupId, { limit = 50, offset = 0 
   return { data: data ?? [] }
 }
 
-export async function loadClientErrorsAction({ limit = 100, includeResolved = false } = {}) {
+export async function loadClientErrorsAction({ limit = 50, offset = 0, includeResolved = false } = {}) {
   await requireAuth()
   const sb = getSupabase()
   let q = sb
     .from('client_errors')
-    .select('*')
+    .select('*', { count: 'exact' })
     .order('created_at', { ascending: false })
-    .limit(limit)
+    .range(offset, offset + limit - 1)
   if (!includeResolved) q = q.is('resolved_at', null)
-  const { data, error } = await q
+  const { data, error, count } = await q
   if (error) return { error: error.message }
-  return { data: data ?? [] }
+  return { data: data ?? [], total: count ?? 0 }
 }
 
 export async function resolveErrorAction(id) {
