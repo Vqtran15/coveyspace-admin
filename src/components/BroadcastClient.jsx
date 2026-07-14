@@ -1,7 +1,11 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useRef, useEffect } from 'react'
+import dynamic from 'next/dynamic'
+import { Smiley } from '@phosphor-icons/react'
 import { broadcastPushAction, loadBroadcastHistoryAction } from '@/actions/admin'
+
+const EmojiPicker = dynamic(() => import('@emoji-mart/react'), { ssr: false })
 
 const PT = 'America/Los_Angeles'
 
@@ -36,6 +40,53 @@ export default function BroadcastClient({ initialHistory }) {
   const [draft, setDraft] = useState('')
   const [error, setError] = useState(null)
   const [isPending, startTransition] = useTransition()
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const [emojiData, setEmojiData] = useState(null)
+
+  const titleRef = useRef(null)
+  const bodyRef = useRef(null)
+  // Tracks which field was focused last so emoji is inserted there
+  const activeFieldRef = useRef('body')
+  const pickerContainerRef = useRef(null)
+
+  // Load emoji data lazily when picker is first opened
+  useEffect(() => {
+    if (pickerOpen && !emojiData) {
+      import('@emoji-mart/data').then(m => setEmojiData(m.default))
+    }
+  }, [pickerOpen, emojiData])
+
+  // Close picker when clicking outside
+  useEffect(() => {
+    if (!pickerOpen) return
+    function handleClick(e) {
+      if (!pickerContainerRef.current?.contains(e.target)) setPickerOpen(false)
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [pickerOpen])
+
+  function insertEmoji(emoji) {
+    const native = emoji.native
+    const isTitle = activeFieldRef.current === 'title'
+    const el = isTitle ? titleRef.current : bodyRef.current
+    const setValue = isTitle ? setTitle : setDraft
+
+    if (el) {
+      const start = el.selectionStart ?? el.value.length
+      const end = el.selectionEnd ?? el.value.length
+      const newVal = el.value.slice(0, start) + native + el.value.slice(end)
+      setValue(newVal)
+      // Restore cursor after React re-render
+      requestAnimationFrame(() => {
+        el.focus()
+        el.setSelectionRange(start + native.length, start + native.length)
+      })
+    } else {
+      setValue(prev => prev + native)
+    }
+    setPickerOpen(false)
+  }
 
   function handleSend() {
     if (!draft.trim()) return
@@ -73,9 +124,11 @@ export default function BroadcastClient({ initialHistory }) {
                   <span className={`text-xs ${titleLen > 50 ? 'text-red-500' : 'text-stone-400'}`}>{titleLen}/50</span>
                 </div>
                 <input
+                  ref={titleRef}
                   type="text"
                   value={title}
                   onChange={e => setTitle(e.target.value)}
+                  onFocus={() => { activeFieldRef.current = 'title' }}
                   placeholder="e.g. What's New"
                   className="w-full text-sm text-stone-800 border border-stone-200 rounded-xl px-3 py-2.5 outline-none focus:border-jade transition-colors"
                 />
@@ -87,14 +140,35 @@ export default function BroadcastClient({ initialHistory }) {
                   <span className={`text-xs ${bodyLen > 200 ? 'text-red-500' : 'text-stone-400'}`}>{bodyLen}/200</span>
                 </div>
                 <textarea
+                  ref={bodyRef}
                   value={draft}
                   onChange={e => setDraft(e.target.value)}
+                  onFocus={() => { activeFieldRef.current = 'body' }}
                   placeholder="e.g. Reminder: this week's meetup is at 7 PM — see you there!"
                   rows={4}
                   className="w-full text-sm text-stone-800 border border-stone-200 rounded-xl px-3 py-2.5 resize-none outline-none focus:border-jade transition-colors"
                 />
               </div>
-              <div className="flex justify-end">
+              <div className="flex items-center justify-between">
+                {/* Emoji picker */}
+                <div className="relative" ref={pickerContainerRef}>
+                  <button
+                    type="button"
+                    onClick={() => setPickerOpen(o => !o)}
+                    className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-stone-500 border border-stone-200 rounded-xl hover:bg-stone-50 transition-colors"
+                  >
+                    <Smiley size={16} />
+                    Emoji
+                  </button>
+                  {pickerOpen && (
+                    <div className="absolute bottom-full mb-2 left-0 z-50 shadow-xl rounded-2xl overflow-hidden">
+                      {emojiData
+                        ? <EmojiPicker data={emojiData} onEmojiSelect={insertEmoji} theme="light" previewPosition="none" skinTonePosition="none" />
+                        : <div className="w-[352px] h-[400px] bg-white flex items-center justify-center text-sm text-stone-400">Loading…</div>
+                      }
+                    </div>
+                  )}
+                </div>
                 <button
                   onClick={handleSend}
                   disabled={!canSend}
