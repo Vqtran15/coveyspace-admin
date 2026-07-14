@@ -1838,6 +1838,7 @@ export default function DashboardClient({ initialGroups }) {
                             <th className="text-left px-5 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">Name</th>
                             <th className="text-left px-5 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">Email</th>
                             <th className="text-left px-5 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">Role</th>
+                            <th className="text-left px-5 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">Push</th>
                             <th className="text-left px-5 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">Last Activity</th>
                             <th className="text-left px-5 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">Last Logged In</th>
                           </tr>
@@ -1879,6 +1880,12 @@ export default function DashboardClient({ initialGroups }) {
                               </td>
                               <td className="px-5 py-3 text-stone-500">{member.email || '—'}</td>
                               <td className="px-5 py-3"><Badge role={member.role} /></td>
+                              <td className="px-5 py-3">
+                                {member.push_subscribed
+                                  ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-teal-50 text-teal-600 border border-teal-200">✓ On</span>
+                                  : <span className="text-xs text-stone-300">—</span>
+                                }
+                              </td>
                               <td className="px-5 py-3 text-xs text-stone-400 whitespace-nowrap">{formatTime(member.last_active_at)}</td>
                               <td className="px-5 py-3 text-xs text-stone-400 whitespace-nowrap">{formatTime(member.last_sign_in_at)}</td>
                             </tr>

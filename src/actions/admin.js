@@ -42,14 +42,16 @@ export async function loadGroups() {
 export async function loadMembers(groupId) {
   await requireAuth()
   const sb = getSupabase()
-  const [{ data: profiles, error: pErr }, { users: authUsers, error: aErr }] = await Promise.all([
+  const [{ data: profiles, error: pErr }, { users: authUsers, error: aErr }, { data: pushSubs }] = await Promise.all([
     sb.from('profiles').select('*').eq('community_group_id', groupId).order('created_at'),
     listAllUsers(sb),
+    sb.from('push_subscriptions').select('user_id').eq('community_group_id', groupId),
   ])
   if (pErr || aErr) return { error: (pErr || aErr).message }
 
   const authMap = Object.fromEntries((authUsers ?? []).map(u => [u.id, u]))
   const userIds = (profiles ?? []).map(p => p.user_id)
+  const pushSubSet = new Set((pushSubs ?? []).map(s => s.user_id))
 
   const { data: sessionData } = await sb.rpc('admin_get_last_session', { user_ids: userIds })
   const sessionMap = Object.fromEntries((sessionData ?? []).map(s => [s.user_id, s.last_active_at]))
@@ -64,6 +66,7 @@ export async function loadMembers(groupId) {
       email: authMap[p.user_id]?.email ?? '',
       last_sign_in_at: authMap[p.user_id]?.last_sign_in_at ?? null,
       last_active_at: sessionMap[p.user_id] ?? null,
+      push_subscribed: pushSubSet.has(p.user_id),
     })),
   }
 }
