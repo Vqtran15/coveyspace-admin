@@ -31,7 +31,7 @@ function timeAgo(iso) {
 }
 
 function getMessage(entry) {
-  return entry.target_label?.replace(/^\[All\] /, '') ?? ''
+  return entry.metadata?.body ?? entry.target_label?.replace(/^\[All\] /, '') ?? ''
 }
 
 export default function BroadcastClient({ initialHistory }) {

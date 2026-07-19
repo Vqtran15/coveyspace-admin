@@ -421,7 +421,7 @@ export async function broadcastPushAction({ groupId, userIds, title: rawTitle, b
         : groupId
         ? body.slice(0, 80)
         : `[All] ${body.slice(0, 80)}`,
-      metadata: { title: rawTitle?.trim() || null, sent: result.sent, stale: result.stale },
+      metadata: { title: rawTitle?.trim() || null, body, sent: result.sent, stale: result.stale },
       ip,
     })
     return { success: true, sent: result.sent ?? 0 }
