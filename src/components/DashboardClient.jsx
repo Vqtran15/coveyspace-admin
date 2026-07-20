@@ -1217,7 +1217,6 @@ export default function DashboardClient({ initialGroups }) {
                           <thead className="border-b border-stone-100">
                             <tr>
                               <SortTh col="name"         label="Group" />
-                              <SortTh col="members"       label="Members"        right />
                               <SortTh col="activeMembers" label="Active (30d)"   right />
                               <SortTh col="messages"      label="Messages"       right />
                               <SortTh col="lastActivity"  label="Last Activity"  right />
@@ -1237,7 +1236,6 @@ export default function DashboardClient({ initialGroups }) {
                                 <td className="py-3 px-4 text-sm font-medium text-stone-800 max-w-[200px]">
                                   <span className="block truncate">{g.name}</span>
                                 </td>
-                                <td className="py-3 px-4 text-sm text-stone-600 text-right tabular-nums">{g.members}</td>
                                 <td className="py-3 px-4 text-sm text-right tabular-nums">
                                   <span className={g.activeMembers === g.members ? 'text-green-600 font-medium' : g.activeMembers === 0 ? 'text-red-400' : 'text-stone-600'}>
                                     {g.activeMembers}
