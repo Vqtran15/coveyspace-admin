@@ -65,7 +65,7 @@ export async function POST(request) {
   try {
     await resend.emails.send({
       from: 'Covey Space <alerts@coveyspace.com>',
-      to: 'vqtran15@gmail.com',
+      to: 'vuong.tran.dev@gmail.com',
       subject,
       html,
     })
