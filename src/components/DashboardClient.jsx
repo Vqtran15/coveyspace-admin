@@ -12,6 +12,11 @@ import {
   loadOrphanedUsers,
   deleteGroupAction,
   deleteUserAction,
+  cancelGroupDeleteAction,
+  cancelUserDeleteAction,
+  executeGroupDeleteAction,
+  executeUserDeleteAction,
+  processPendingDeletionsAction,
   renameGroupAction,
   editDisplayNameAction,
   toggleRoleAction,
@@ -318,6 +323,7 @@ export default function DashboardClient({ initialGroups }) {
   }
 
   async function loadAllMetrics(range) {
+    processPendingDeletionsAction()
     const { ga4Start, ga4End, supaStart, supaEnd } = getQueryDates(range)
     setLoadingMetrics(true)
     setLoadingGa4(true)
@@ -639,11 +645,38 @@ export default function DashboardClient({ initialGroups }) {
   // --- Group actions ---
   async function handleDeleteGroup(group) {
     ask(
-      `Delete group "${group.name}" and all its members? This cannot be undone.`,
+      `Schedule deletion of group "${group.name}"? You'll have 72 hours to cancel.`,
       async () => {
         setConfirm(null)
         startTransition(async () => {
           const r = await deleteGroupAction(group.id, group.name)
+          if (r.error) { showToast(r.error, 'error'); return }
+          setGroups(gs => gs.map(g => g.id === group.id ? { ...g, scheduledDeleteAt: r.scheduled_delete_at } : g))
+          if (selectedGroup?.id === group.id) setSelectedGroup(s => ({ ...s, scheduledDeleteAt: r.scheduled_delete_at }))
+          showToast(`Deletion of "${group.name}" scheduled — 72 hours to cancel`)
+        })
+      },
+      false
+    )
+  }
+
+  async function handleCancelGroupDelete(group) {
+    startTransition(async () => {
+      const r = await cancelGroupDeleteAction(group.id, group.name)
+      if (r.error) { showToast(r.error, 'error'); return }
+      setGroups(gs => gs.map(g => g.id === group.id ? { ...g, scheduledDeleteAt: null } : g))
+      if (selectedGroup?.id === group.id) setSelectedGroup(s => ({ ...s, scheduledDeleteAt: null }))
+      showToast('Deletion cancelled')
+    })
+  }
+
+  async function handleOverrideGroupDelete(group) {
+    ask(
+      `Immediately delete group "${group.name}" and all its members? This cannot be undone.`,
+      async () => {
+        setConfirm(null)
+        startTransition(async () => {
+          const r = await executeGroupDeleteAction(group.id, group.name)
           if (r.error) { showToast(r.error, 'error'); return }
           setGroups(gs => gs.filter(g => g.id !== group.id))
           if (selectedGroup?.id === group.id) { setSelectedGroup(null); setMembers([]) }
@@ -657,15 +690,40 @@ export default function DashboardClient({ initialGroups }) {
 
   async function handleDeleteUser(member) {
     ask(
-      `Delete user "${member.display_name || member.email}"? This cannot be undone.`,
+      `Schedule deletion of "${member.display_name || member.email}"? You'll have 72 hours to cancel.`,
       async () => {
         setConfirm(null)
         startTransition(async () => {
           const r = await deleteUserAction(member.id, member.display_name || member.email)
           if (r.error) { showToast(r.error, 'error'); return }
+          setMembers(ms => ms.map(m => m.id === member.id ? { ...m, scheduled_delete_at: r.scheduled_delete_at } : m))
+          showToast(`Deletion of "${member.display_name || member.email}" scheduled — 72 hours to cancel`)
+        })
+      },
+      false
+    )
+  }
+
+  async function handleCancelUserDelete(member) {
+    startTransition(async () => {
+      const r = await cancelUserDeleteAction(member.id, member.display_name || member.email)
+      if (r.error) { showToast(r.error, 'error'); return }
+      setMembers(ms => ms.map(m => m.id === member.id ? { ...m, scheduled_delete_at: null } : m))
+      showToast('Deletion cancelled')
+    })
+  }
+
+  async function handleOverrideUserDelete(member) {
+    ask(
+      `Immediately delete user "${member.display_name || member.email}"? This cannot be undone.`,
+      async () => {
+        setConfirm(null)
+        startTransition(async () => {
+          const r = await executeUserDeleteAction(member.id, member.display_name || member.email)
+          if (r.error) { showToast(r.error, 'error'); return }
           setMembers(ms => ms.filter(m => m.id !== member.id))
           setGroups(gs => gs.map(g =>
-            g.id === selectedGroup.id ? { ...g, member_count: (g.member_count || 1) - 1 } : g
+            g.id === selectedGroup?.id ? { ...g, member_count: (g.member_count || 1) - 1 } : g
           ))
           showToast(`Deleted user "${member.display_name || member.email}"`)
         })
@@ -859,6 +917,14 @@ export default function DashboardClient({ initialGroups }) {
                     {(group.member_count || 0) === 0 && ' · Empty'}
                     {' · '}{formatDate(group.created_at)}
                   </p>
+                  {group.scheduledDeleteAt && (
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <span className="text-[11px] font-medium text-amber-600">⏳ Deletes {timeAgo(group.scheduledDeleteAt)}</span>
+                      <button onClick={e => { e.stopPropagation(); handleCancelGroupDelete(group) }} className="text-[11px] text-stone-400 underline hover:text-stone-600">Cancel</button>
+                      <span className="text-stone-300 text-[10px]">·</span>
+                      <button onClick={e => { e.stopPropagation(); handleOverrideGroupDelete(group) }} className="text-[11px] text-red-400 underline hover:text-red-600">Delete now</button>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
@@ -1714,12 +1780,29 @@ export default function DashboardClient({ initialGroups }) {
                             Rename group
                           </button>
                           <div className="border-t border-stone-100 mt-1 pt-1">
-                            <button
-                              onClick={() => { setShowGroupMenu(false); handleDeleteGroup(selectedGroup) }}
-                              className="w-full text-left px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 transition-colors"
-                            >
-                              Delete group
-                            </button>
+                            {selectedGroup.scheduledDeleteAt ? (
+                              <>
+                                <button
+                                  onClick={() => { setShowGroupMenu(false); handleCancelGroupDelete(selectedGroup) }}
+                                  className="w-full text-left px-4 py-2.5 text-sm text-amber-600 hover:bg-amber-50 transition-colors"
+                                >
+                                  Cancel deletion
+                                </button>
+                                <button
+                                  onClick={() => { setShowGroupMenu(false); handleOverrideGroupDelete(selectedGroup) }}
+                                  className="w-full text-left px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 transition-colors"
+                                >
+                                  Delete now
+                                </button>
+                              </>
+                            ) : (
+                              <button
+                                onClick={() => { setShowGroupMenu(false); handleDeleteGroup(selectedGroup) }}
+                                className="w-full text-left px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 transition-colors"
+                              >
+                                Delete group
+                              </button>
+                            )}
                           </div>
                         </div>
                       </>
@@ -1892,7 +1975,17 @@ export default function DashboardClient({ initialGroups }) {
                                 }
                               </td>
                               <td className="px-5 py-3 text-xs text-stone-400 whitespace-nowrap">{formatTime(member.last_active_at)}</td>
-                              <td className="px-5 py-3 text-xs text-stone-400 whitespace-nowrap">{formatTime(member.last_sign_in_at)}</td>
+                              <td className="px-5 py-3 text-xs text-stone-400 whitespace-nowrap">
+                                {formatTime(member.last_sign_in_at)}
+                                {member.scheduled_delete_at && (
+                                  <div className="flex items-center gap-1.5 mt-0.5">
+                                    <span className="text-[11px] font-medium text-amber-600">⏳ Deletes {timeAgo(member.scheduled_delete_at)}</span>
+                                    <button onClick={e => { e.stopPropagation(); handleCancelUserDelete(member) }} className="text-[11px] text-stone-400 underline hover:text-stone-600">Cancel</button>
+                                    <span className="text-stone-300 text-[10px]">·</span>
+                                    <button onClick={e => { e.stopPropagation(); handleOverrideUserDelete(member) }} className="text-[11px] text-red-400 underline hover:text-red-600">Delete now</button>
+                                  </div>
+                                )}
+                              </td>
                             </tr>
                           ))}
                         </tbody>

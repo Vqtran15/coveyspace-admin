@@ -27,7 +27,7 @@ export async function loadGroups() {
   await requireAuth()
   const { data, error } = await getSupabase()
     .from('community_groups')
-    .select('id, name, created_at, profiles(count)')
+    .select('id, name, created_at, scheduled_delete_at, profiles(count)')
     .order('created_at', { ascending: false })
   if (error) return { error: error.message }
   const mapped = (data ?? []).map(g => ({
@@ -35,6 +35,7 @@ export async function loadGroups() {
     name: g.name,
     created_at: g.created_at,
     member_count: g.profiles?.[0]?.count ?? 0,
+    scheduledDeleteAt: g.scheduled_delete_at ?? null,
   }))
   return { data: mapped }
 }
@@ -67,11 +68,12 @@ export async function loadMembers(groupId) {
       last_sign_in_at: authMap[p.user_id]?.last_sign_in_at ?? null,
       last_active_at: sessionMap[p.user_id] ?? null,
       push_subscribed: pushSubSet.has(p.user_id),
+      scheduled_delete_at: p.scheduled_delete_at ?? null,
     })),
   }
 }
 
-export async function deleteGroupAction(groupId, groupName) {
+export async function executeGroupDeleteAction(groupId, groupName) {
   await requireAuth()
   const ip = getIp()
   const sb = getSupabase()
@@ -110,7 +112,44 @@ export async function deleteGroupAction(groupId, groupName) {
   }
 }
 
-export async function deleteUserAction(userId, userName) {
+export async function deleteGroupAction(groupId, groupName) {
+  await requireAuth()
+  const ip = getIp()
+  const sb = getSupabase()
+  try {
+    const scheduledAt = new Date(Date.now() + 72 * 60 * 60 * 1000).toISOString()
+    const { data, error } = await sb
+      .from('community_groups')
+      .update({ scheduled_delete_at: scheduledAt })
+      .eq('id', groupId)
+      .select('scheduled_delete_at')
+      .single()
+    if (error) return { error: error.message }
+    await logAudit({ action: 'schedule_delete_group', targetType: 'group', targetId: groupId, targetLabel: groupName, ip })
+    return { success: true, scheduled_delete_at: data.scheduled_delete_at }
+  } catch (e) {
+    return { error: e.message }
+  }
+}
+
+export async function cancelGroupDeleteAction(groupId, groupName) {
+  await requireAuth()
+  const ip = getIp()
+  const sb = getSupabase()
+  try {
+    const { error } = await sb
+      .from('community_groups')
+      .update({ scheduled_delete_at: null })
+      .eq('id', groupId)
+    if (error) return { error: error.message }
+    await logAudit({ action: 'cancel_delete_group', targetType: 'group', targetId: groupId, targetLabel: groupName, ip })
+    return { success: true }
+  } catch (e) {
+    return { error: e.message }
+  }
+}
+
+export async function executeUserDeleteAction(userId, userName) {
   await requireAuth()
   const ip = getIp()
   const sb = getSupabase()
@@ -130,6 +169,71 @@ export async function deleteUserAction(userId, userName) {
   } catch (e) {
     return { error: e.message }
   }
+}
+
+export async function deleteUserAction(userId, userName) {
+  await requireAuth()
+  const ip = getIp()
+  const sb = getSupabase()
+  try {
+    const scheduledAt = new Date(Date.now() + 72 * 60 * 60 * 1000).toISOString()
+    const { data, error } = await sb
+      .from('profiles')
+      .update({ scheduled_delete_at: scheduledAt })
+      .eq('user_id', userId)
+      .select('scheduled_delete_at')
+      .single()
+    if (error) return { error: error.message }
+    await logAudit({ action: 'schedule_delete_user', targetType: 'user', targetId: userId, targetLabel: userName, ip })
+    return { success: true, scheduled_delete_at: data.scheduled_delete_at }
+  } catch (e) {
+    return { error: e.message }
+  }
+}
+
+export async function cancelUserDeleteAction(userId, userName) {
+  await requireAuth()
+  const ip = getIp()
+  const sb = getSupabase()
+  try {
+    const { error } = await sb
+      .from('profiles')
+      .update({ scheduled_delete_at: null })
+      .eq('user_id', userId)
+    if (error) return { error: error.message }
+    await logAudit({ action: 'cancel_delete_user', targetType: 'user', targetId: userId, targetLabel: userName, ip })
+    return { success: true }
+  } catch (e) {
+    return { error: e.message }
+  }
+}
+
+export async function processPendingDeletionsAction() {
+  await requireAuth()
+  const sb = getSupabase()
+  const now = new Date().toISOString()
+  const results = []
+
+  try {
+    const [{ data: expiredGroups }, { data: expiredProfiles }] = await Promise.all([
+      sb.from('community_groups').select('id, name').lt('scheduled_delete_at', now).not('scheduled_delete_at', 'is', null),
+      sb.from('profiles').select('user_id, display_name').lt('scheduled_delete_at', now).not('scheduled_delete_at', 'is', null),
+    ])
+
+    for (const g of expiredGroups ?? []) {
+      const r = await executeGroupDeleteAction(g.id, g.name)
+      results.push({ type: 'group', id: g.id, name: g.name, ...r })
+    }
+
+    for (const p of expiredProfiles ?? []) {
+      const r = await executeUserDeleteAction(p.user_id, p.display_name)
+      results.push({ type: 'user', id: p.user_id, name: p.display_name, ...r })
+    }
+  } catch (e) {
+    return { error: e.message, results }
+  }
+
+  return { results }
 }
 
 export async function renameGroupAction(groupId, oldName, newName) {
@@ -325,7 +429,7 @@ export async function loadMetricsAction({ periodStart, periodEnd } = {}) {
     sb.from('community_groups').select('*', { count: 'exact', head: true }).gte('created_at', start).lte('created_at', end),
     sb.from('profiles').select('*', { count: 'exact', head: true }).gte('created_at', start).lte('created_at', end),
     sb.from('messages').select('*', { count: 'exact', head: true }).gte('created_at', start).lte('created_at', end),
-    sb.from('community_groups').select('id, name, created_at, profiles(count)').order('created_at', { ascending: false }),
+    sb.from('community_groups').select('id, name, created_at, scheduled_delete_at, profiles(count)').order('created_at', { ascending: false }),
     sb.from('conversations').select('community_group_id, updated_at, messages(count)'),
     sb.from('profiles').select('user_id, community_group_id, last_seen_at'),
     sb.from('prayer_requests').select('member_user_id, created_at'),
@@ -346,6 +450,7 @@ export async function loadMetricsAction({ periodStart, periodEnd } = {}) {
       lastActivity: null,
       lastSeen: null,
       activeMembers: 0,
+      scheduledDeleteAt: g.scheduled_delete_at ?? null,
     }
   }
 
