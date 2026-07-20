@@ -317,6 +317,8 @@ export async function loadMetricsAction({ periodStart, periodEnd } = {}) {
     { data: prayerReactionsData },
     { data: signupsData },
     { data: mealPagesData },
+    { data: servingSignupsData },
+    { data: servingPagesData },
     { users: allAuthUsers },
   ] = await Promise.all([
     sb.from('community_groups').select('*', { count: 'exact', head: true }),
@@ -331,6 +333,8 @@ export async function loadMetricsAction({ periodStart, periodEnd } = {}) {
     sb.from('prayer_reactions').select('community_group_id, created_at'),
     sb.from('signups').select('meal_page_id, created_at'),
     sb.from('meal_pages').select('id, community_group_id'),
+    sb.from('serving_signups').select('serving_page_id, created_at'),
+    sb.from('serving_pages').select('id, community_group_id'),
     listAllUsers(sb),
   ])
 
@@ -348,6 +352,7 @@ export async function loadMetricsAction({ periodStart, periodEnd } = {}) {
 
   const userGroupMap = Object.fromEntries((profilesData ?? []).map(p => [p.user_id, p.community_group_id]))
   const mealPageGroupMap = Object.fromEntries((mealPagesData ?? []).map(p => [p.id, p.community_group_id]))
+  const servingPageGroupMap = Object.fromEntries((servingPagesData ?? []).map(p => [p.id, p.community_group_id]))
 
   function bumpActivity(s, ts) {
     if (s && ts && (!s.lastActivity || ts > s.lastActivity)) s.lastActivity = ts
@@ -367,6 +372,9 @@ export async function loadMetricsAction({ periodStart, periodEnd } = {}) {
   }
   for (const su of signupsData ?? []) {
     bumpActivity(statsMap[mealPageGroupMap[su.meal_page_id]], su.created_at)
+  }
+  for (const su of servingSignupsData ?? []) {
+    bumpActivity(statsMap[servingPageGroupMap[su.serving_page_id]], su.created_at)
   }
 
   for (const user of allAuthUsers ?? []) {
