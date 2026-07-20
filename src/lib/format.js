@@ -27,3 +27,15 @@ export function timeAgo(iso) {
   const mo = Math.floor(d / 30)
   return `${mo}mo ago`
 }
+
+export function timeUntil(iso) {
+  if (!iso) return '—'
+  const ms = new Date(iso).getTime() - Date.now()
+  if (ms <= 0) return 'soon'
+  const m = Math.floor(ms / 60000)
+  if (m < 60) return `in ${m}m`
+  const h = Math.floor(m / 60)
+  if (h < 24) return `in ${h}h`
+  const d = Math.floor(h / 24)
+  return `in ${d}d`
+}

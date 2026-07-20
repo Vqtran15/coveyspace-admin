@@ -35,7 +35,7 @@ import {
 } from '@/actions/admin'
 import AdminNav from '@/components/AdminNav'
 import { loadGA4MetricsAction } from '@/actions/analytics'
-import { formatTime, formatDate, timeAgo } from '@/lib/format'
+import { formatTime, formatDate, timeAgo, timeUntil } from '@/lib/format'
 
 function DailyUsersChart({ data, id, color }) {
   if (!data?.length) return null
@@ -323,7 +323,7 @@ export default function DashboardClient({ initialGroups }) {
   }
 
   async function loadAllMetrics(range) {
-    processPendingDeletionsAction()
+    processPendingDeletionsAction().catch(() => {})
     const { ga4Start, ga4End, supaStart, supaEnd } = getQueryDates(range)
     setLoadingMetrics(true)
     setLoadingGa4(true)
@@ -511,7 +511,7 @@ export default function DashboardClient({ initialGroups }) {
       async () => {
         setConfirm(null)
         startTransition(async () => {
-          const r = await deleteUserAction(user.id, user.email)
+          const r = await executeUserDeleteAction(user.id, user.email)
           if (r.error) { showToast(r.error, 'error'); return }
           setOrphanedUsers(os => os.filter(o => o.id !== user.id))
           showToast(`Deleted ${user.email}`)
@@ -656,7 +656,7 @@ export default function DashboardClient({ initialGroups }) {
           showToast(`Deletion of "${group.name}" scheduled — 72 hours to cancel`)
         })
       },
-      false
+      true
     )
   }
 
@@ -700,7 +700,7 @@ export default function DashboardClient({ initialGroups }) {
           showToast(`Deletion of "${member.display_name || member.email}" scheduled — 72 hours to cancel`)
         })
       },
-      false
+      true
     )
   }
 
@@ -919,7 +919,7 @@ export default function DashboardClient({ initialGroups }) {
                   </p>
                   {group.scheduledDeleteAt && (
                     <div className="flex items-center gap-1.5 mt-0.5">
-                      <span className="text-[11px] font-medium text-amber-600">⏳ Deletes {timeAgo(group.scheduledDeleteAt)}</span>
+                      <span className="text-[11px] font-medium text-amber-600">⏳ Deletes {timeUntil(group.scheduledDeleteAt)}</span>
                       <button onClick={e => { e.stopPropagation(); handleCancelGroupDelete(group) }} className="text-[11px] text-stone-400 underline hover:text-stone-600">Cancel</button>
                       <span className="text-stone-300 text-[10px]">·</span>
                       <button onClick={e => { e.stopPropagation(); handleOverrideGroupDelete(group) }} className="text-[11px] text-red-400 underline hover:text-red-600">Delete now</button>
@@ -1979,7 +1979,7 @@ export default function DashboardClient({ initialGroups }) {
                                 {formatTime(member.last_sign_in_at)}
                                 {member.scheduled_delete_at && (
                                   <div className="flex items-center gap-1.5 mt-0.5">
-                                    <span className="text-[11px] font-medium text-amber-600">⏳ Deletes {timeAgo(member.scheduled_delete_at)}</span>
+                                    <span className="text-[11px] font-medium text-amber-600">⏳ Deletes {timeUntil(member.scheduled_delete_at)}</span>
                                     <button onClick={e => { e.stopPropagation(); handleCancelUserDelete(member) }} className="text-[11px] text-stone-400 underline hover:text-stone-600">Cancel</button>
                                     <span className="text-stone-300 text-[10px]">·</span>
                                     <button onClick={e => { e.stopPropagation(); handleOverrideUserDelete(member) }} className="text-[11px] text-red-400 underline hover:text-red-600">Delete now</button>
