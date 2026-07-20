@@ -18,7 +18,7 @@ async function freshToken() {
 export async function middleware(request) {
   const { pathname } = request.nextUrl
 
-  if (pathname.startsWith('/login') || pathname.startsWith('/_next')) {
+  if (pathname.startsWith('/login') || pathname.startsWith('/_next') || pathname.startsWith('/api/')) {
     return NextResponse.next()
   }
 
