@@ -1217,10 +1217,11 @@ export default function DashboardClient({ initialGroups }) {
                           <thead className="border-b border-stone-100">
                             <tr>
                               <SortTh col="name"         label="Group" />
-                              <SortTh col="members"      label="Members"       right />
-                              <SortTh col="messages"     label="Messages"      right />
-                              <SortTh col="lastActivity" label="Last Activity" right />
-                              <SortTh col="lastLogin"    label="Last Login"    right />
+                              <SortTh col="members"       label="Members"        right />
+                              <SortTh col="activeMembers" label="Active (30d)"   right />
+                              <SortTh col="messages"      label="Messages"       right />
+                              <SortTh col="lastActivity"  label="Last Activity"  right />
+                              <SortTh col="lastSeen"      label="Last App Open"  right />
                             </tr>
                           </thead>
                           <tbody>
@@ -1237,9 +1238,15 @@ export default function DashboardClient({ initialGroups }) {
                                   <span className="block truncate">{g.name}</span>
                                 </td>
                                 <td className="py-3 px-4 text-sm text-stone-600 text-right tabular-nums">{g.members}</td>
+                                <td className="py-3 px-4 text-sm text-right tabular-nums">
+                                  <span className={g.activeMembers === g.members ? 'text-green-600 font-medium' : g.activeMembers === 0 ? 'text-red-400' : 'text-stone-600'}>
+                                    {g.activeMembers}
+                                  </span>
+                                  <span className="text-stone-400"> / {g.members}</span>
+                                </td>
                                 <td className="py-3 px-4 text-sm text-stone-600 text-right tabular-nums">{g.messages.toLocaleString()}</td>
                                 <td className="py-3 px-4 text-sm text-stone-500 text-right whitespace-nowrap" title={formatTime(g.lastActivity)}>{timeAgo(g.lastActivity)}</td>
-                                <td className="py-3 px-4 text-sm text-stone-500 text-right whitespace-nowrap" title={formatTime(g.lastLogin)}>{timeAgo(g.lastLogin)}</td>
+                                <td className="py-3 px-4 text-sm text-stone-500 text-right whitespace-nowrap" title={formatTime(g.lastSeen)}>{timeAgo(g.lastSeen)}</td>
                               </tr>
                             ))}
                           </tbody>

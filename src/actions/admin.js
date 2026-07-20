@@ -319,7 +319,6 @@ export async function loadMetricsAction({ periodStart, periodEnd } = {}) {
     { data: mealPagesData },
     { data: servingSignupsData },
     { data: servingPagesData },
-    { users: allAuthUsers },
   ] = await Promise.all([
     sb.from('community_groups').select('*', { count: 'exact', head: true }),
     sb.from('profiles').select('*', { count: 'exact', head: true }),
@@ -328,14 +327,13 @@ export async function loadMetricsAction({ periodStart, periodEnd } = {}) {
     sb.from('messages').select('*', { count: 'exact', head: true }).gte('created_at', start).lte('created_at', end),
     sb.from('community_groups').select('id, name, created_at, profiles(count)').order('created_at', { ascending: false }),
     sb.from('conversations').select('community_group_id, updated_at, messages(count)'),
-    sb.from('profiles').select('user_id, community_group_id'),
+    sb.from('profiles').select('user_id, community_group_id, last_seen_at'),
     sb.from('prayer_requests').select('member_user_id, created_at'),
     sb.from('prayer_reactions').select('community_group_id, created_at'),
     sb.from('signups').select('meal_page_id, created_at'),
     sb.from('meal_pages').select('id, community_group_id'),
     sb.from('serving_signups').select('serving_page_id, created_at'),
     sb.from('serving_pages').select('id, community_group_id'),
-    listAllUsers(sb),
   ])
 
   // Build per-group stats keyed by group id
@@ -346,7 +344,8 @@ export async function loadMetricsAction({ periodStart, periodEnd } = {}) {
       members: g.profiles?.[0]?.count ?? 0,
       messages: 0,
       lastActivity: null,
-      lastLogin: null,
+      lastSeen: null,
+      activeMembers: 0,
     }
   }
 
@@ -377,10 +376,14 @@ export async function loadMetricsAction({ periodStart, periodEnd } = {}) {
     bumpActivity(statsMap[servingPageGroupMap[su.serving_page_id]], su.created_at)
   }
 
-  for (const user of allAuthUsers ?? []) {
-    const s = statsMap[userGroupMap[user.id]]
-    if (!s || !user.last_sign_in_at) continue
-    if (!s.lastLogin || user.last_sign_in_at > s.lastLogin) s.lastLogin = user.last_sign_in_at
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString()
+  for (const p of profilesData ?? []) {
+    const s = statsMap[p.community_group_id]
+    if (!s) continue
+    if (p.last_seen_at) {
+      if (!s.lastSeen || p.last_seen_at > s.lastSeen) s.lastSeen = p.last_seen_at
+      if (p.last_seen_at >= thirtyDaysAgo) s.activeMembers++
+    }
   }
   const groupStats = Object.values(statsMap)
 
