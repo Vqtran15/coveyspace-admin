@@ -313,6 +313,10 @@ export async function loadMetricsAction({ periodStart, periodEnd } = {}) {
     { data: groupsWithMembers },
     { data: convData },
     { data: profilesData },
+    { data: prayerRequestsData },
+    { data: prayerReactionsData },
+    { data: signupsData },
+    { data: mealPagesData },
     { users: allAuthUsers },
   ] = await Promise.all([
     sb.from('community_groups').select('*', { count: 'exact', head: true }),
@@ -323,6 +327,10 @@ export async function loadMetricsAction({ periodStart, periodEnd } = {}) {
     sb.from('community_groups').select('id, name, created_at, profiles(count)').order('created_at', { ascending: false }),
     sb.from('conversations').select('community_group_id, updated_at, messages(count)'),
     sb.from('profiles').select('user_id, community_group_id'),
+    sb.from('prayer_requests').select('member_user_id, created_at'),
+    sb.from('prayer_reactions').select('community_group_id, created_at'),
+    sb.from('signups').select('meal_page_id, created_at'),
+    sb.from('meal_pages').select('id, community_group_id'),
     listAllUsers(sb),
   ])
 
@@ -337,13 +345,30 @@ export async function loadMetricsAction({ periodStart, periodEnd } = {}) {
       lastLogin: null,
     }
   }
+
+  const userGroupMap = Object.fromEntries((profilesData ?? []).map(p => [p.user_id, p.community_group_id]))
+  const mealPageGroupMap = Object.fromEntries((mealPagesData ?? []).map(p => [p.id, p.community_group_id]))
+
+  function bumpActivity(s, ts) {
+    if (s && ts && (!s.lastActivity || ts > s.lastActivity)) s.lastActivity = ts
+  }
+
   for (const conv of convData ?? []) {
     const s = statsMap[conv.community_group_id]
     if (!s) continue
     s.messages += conv.messages?.[0]?.count ?? 0
-    if (!s.lastActivity || conv.updated_at > s.lastActivity) s.lastActivity = conv.updated_at
+    bumpActivity(s, conv.updated_at)
   }
-  const userGroupMap = Object.fromEntries((profilesData ?? []).map(p => [p.user_id, p.community_group_id]))
+  for (const pr of prayerRequestsData ?? []) {
+    bumpActivity(statsMap[userGroupMap[pr.member_user_id]], pr.created_at)
+  }
+  for (const rx of prayerReactionsData ?? []) {
+    bumpActivity(statsMap[rx.community_group_id], rx.created_at)
+  }
+  for (const su of signupsData ?? []) {
+    bumpActivity(statsMap[mealPageGroupMap[su.meal_page_id]], su.created_at)
+  }
+
   for (const user of allAuthUsers ?? []) {
     const s = statsMap[userGroupMap[user.id]]
     if (!s || !user.last_sign_in_at) continue
