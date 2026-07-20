@@ -4,6 +4,38 @@ import { useState, useTransition } from 'react'
 import { loadClientErrorsAction, resolveErrorAction, resolveAllErrorsAction } from '@/actions/admin'
 import { formatTime, timeAgo } from '@/lib/format'
 
+function buildCopyText(err) {
+  const lines = [
+    `Error: ${err.error_message ?? '—'}`,
+    `Time: ${err.created_at ? formatTime(err.created_at) : '—'}`,
+    `Route: ${err.route ?? '—'}`,
+    `Component: ${err.component ?? '—'}`,
+    `User: ${err.display_name ?? err.user_id ?? 'Anonymous'}`,
+  ]
+  if (err.error_stack) lines.push('', 'Stack Trace:', err.error_stack)
+  if (err.metadata)    lines.push('', 'Metadata:', JSON.stringify(err.metadata, null, 2))
+  return lines.join('\n')
+}
+
+function CopyButton({ err }) {
+  const [copied, setCopied] = useState(false)
+  function handleCopy(e) {
+    e.stopPropagation()
+    navigator.clipboard.writeText(buildCopyText(err)).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
+  }
+  return (
+    <button
+      onClick={handleCopy}
+      className="text-xs font-medium text-stone-400 hover:text-stone-700 border border-stone-200 hover:border-stone-400 rounded-lg px-2.5 py-1 transition-colors"
+    >
+      {copied ? 'Copied!' : 'Copy Error'}
+    </button>
+  )
+}
+
 const PAGE_SIZE = 50
 
 export default function ErrorsClient({ initialErrors, initialTotal, initialError }) {
@@ -141,7 +173,7 @@ export default function ErrorsClient({ initialErrors, initialTotal, initialError
                       <span className="text-stone-300 text-xs mt-0.5 shrink-0">{isExpanded ? '▼' : '▶'}</span>
 
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-stone-800 truncate">{err.error_message}</p>
+                        <p className="text-sm font-medium text-stone-800 break-words">{err.error_message}</p>
                         <div className="flex items-center gap-3 mt-0.5 flex-wrap">
                           {err.route && (
                             <span className="text-xs text-stone-400 font-mono">{err.route}</span>
@@ -173,7 +205,11 @@ export default function ErrorsClient({ initialErrors, initialTotal, initialError
 
                     {isExpanded && (
                       <div className="px-5 pb-4 space-y-3 border-t border-stone-50 bg-stone-50/50">
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3">
+                        <div className="flex items-center justify-between pt-3">
+                          <p className="text-sm font-medium text-stone-800 break-words flex-1 mr-4">{err.error_message}</p>
+                          <CopyButton err={err} />
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                           <div>
                             <p className="text-xs text-stone-400 font-medium uppercase tracking-wider mb-0.5">Time</p>
                             <p className="text-xs text-stone-600">{formatTime(err.created_at)}</p>
