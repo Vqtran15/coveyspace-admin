@@ -68,6 +68,7 @@ export async function loadMembers(groupId) {
       last_sign_in_at: authMap[p.user_id]?.last_sign_in_at ?? null,
       last_active_at: sessionMap[p.user_id] ?? null,
       push_subscribed: pushSubSet.has(p.user_id),
+      is_pwa: p.is_pwa ?? false,
       scheduled_delete_at: p.scheduled_delete_at ?? null,
     })),
   }

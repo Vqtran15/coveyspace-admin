@@ -1927,6 +1927,7 @@ export default function DashboardClient({ initialGroups }) {
                             <th className="text-left px-5 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">Email</th>
                             <th className="text-left px-5 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">Role</th>
                             <th className="text-left px-5 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">Push</th>
+                            <th className="text-left px-5 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">PWA</th>
                             <th className="text-left px-5 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">Last Activity</th>
                             <th className="text-left px-5 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">Last Logged In</th>
                           </tr>
@@ -1971,6 +1972,12 @@ export default function DashboardClient({ initialGroups }) {
                               <td className="px-5 py-3">
                                 {member.push_subscribed
                                   ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-teal-50 text-teal-600 border border-teal-200">✓ On</span>
+                                  : <span className="text-xs text-stone-300">—</span>
+                                }
+                              </td>
+                              <td className="px-5 py-3">
+                                {member.is_pwa
+                                  ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-jade/10 text-jade border border-jade/20">✓ Installed</span>
                                   : <span className="text-xs text-stone-300">—</span>
                                 }
                               </td>
