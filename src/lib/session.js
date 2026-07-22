@@ -34,11 +34,13 @@ async function signToken() {
 
 export async function createSession() {
   const token = await signToken()
-  cookies().set(COOKIE, token, COOKIE_OPTS)
+  const cookieStore = await cookies()
+  cookieStore.set(COOKIE, token, COOKIE_OPTS)
 }
 
-export function destroySession() {
-  cookies().delete(COOKIE)
+export async function destroySession() {
+  const cookieStore = await cookies()
+  cookieStore.delete(COOKIE)
 }
 
 export async function createPendingOtp(code) {
@@ -47,28 +49,32 @@ export async function createPendingOtp(code) {
     .setIssuedAt()
     .setExpirationTime('10m')
     .sign(secret())
-  cookies().set(PENDING_COOKIE, token, PENDING_OPTS)
+  const cookieStore = await cookies()
+  cookieStore.set(PENDING_COOKIE, token, PENDING_OPTS)
 }
 
 export async function verifyAndConsumePendingOtp(inputCode) {
-  const token = cookies().get(PENDING_COOKIE)?.value
+  const cookieStore = await cookies()
+  const token = cookieStore.get(PENDING_COOKIE)?.value
   if (!token) return { error: 'Session expired. Please log in again.' }
   try {
     const { payload } = await jwtVerify(token, secret())
     if (payload.code !== inputCode.trim()) return { error: 'Incorrect code.' }
-    cookies().delete(PENDING_COOKIE)
+    cookieStore.delete(PENDING_COOKIE)
     return { ok: true }
   } catch {
     return { error: 'Session expired. Please log in again.' }
   }
 }
 
-export function clearPendingOtp() {
-  cookies().delete(PENDING_COOKIE)
+export async function clearPendingOtp() {
+  const cookieStore = await cookies()
+  cookieStore.delete(PENDING_COOKIE)
 }
 
 export async function requireAuth() {
-  const token = cookies().get(COOKIE)?.value
+  const cookieStore = await cookies()
+  const token = cookieStore.get(COOKIE)?.value
   if (!token) redirect('/login')
   try {
     await jwtVerify(token, secret())

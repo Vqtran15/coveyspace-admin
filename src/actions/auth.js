@@ -6,8 +6,8 @@ import { logAudit } from '@/lib/audit'
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 
-function getIp() {
-  const h = headers()
+async function getIp() {
+  const h = await headers()
   return h.get('x-forwarded-for')?.split(',')[0]?.trim()
     || h.get('x-real-ip')
     || 'unknown'
@@ -47,7 +47,7 @@ async function sendOtpEmail(code) {
 }
 
 export async function loginAction(email, password) {
-  const ip = getIp()
+  const ip = await getIp()
 
   const { locked } = await checkRateLimit(ip)
   if (locked) {
@@ -77,7 +77,7 @@ export async function loginAction(email, password) {
 }
 
 export async function verifyOtpAction(code) {
-  const ip = getIp()
+  const ip = await getIp()
   const result = await verifyAndConsumePendingOtp(code)
   if (result.error) return { error: result.error }
   await createSession()
@@ -92,14 +92,14 @@ export async function resendOtpAction() {
   } catch (e) {
     return { error: 'Could not send verification email. Please try again.' }
   }
-  clearPendingOtp()
+  await clearPendingOtp()
   await createPendingOtp(code)
   return { ok: true }
 }
 
 export async function logoutAction() {
-  const ip = getIp()
+  const ip = await getIp()
   await logAudit({ action: 'logout', ip })
-  destroySession()
+  await destroySession()
   redirect('/login')
 }

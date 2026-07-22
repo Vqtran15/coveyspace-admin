@@ -5,8 +5,8 @@ import { getSupabase } from '@/lib/supabase'
 import { logAudit } from '@/lib/audit'
 import { headers } from 'next/headers'
 
-function getIp() {
-  const h = headers()
+async function getIp() {
+  const h = await headers()
   return h.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
 }
 
@@ -76,7 +76,7 @@ export async function loadMembers(groupId) {
 
 export async function executeGroupDeleteAction(groupId, groupName) {
   await requireAuth()
-  const ip = getIp()
+  const ip = await getIp()
   const sb = getSupabase()
   try {
     const { data: profiles } = await sb
@@ -115,7 +115,7 @@ export async function executeGroupDeleteAction(groupId, groupName) {
 
 export async function deleteGroupAction(groupId, groupName) {
   await requireAuth()
-  const ip = getIp()
+  const ip = await getIp()
   const sb = getSupabase()
   try {
     const scheduledAt = new Date(Date.now() + 72 * 60 * 60 * 1000).toISOString()
@@ -135,7 +135,7 @@ export async function deleteGroupAction(groupId, groupName) {
 
 export async function cancelGroupDeleteAction(groupId, groupName) {
   await requireAuth()
-  const ip = getIp()
+  const ip = await getIp()
   const sb = getSupabase()
   try {
     const { error } = await sb
@@ -152,7 +152,7 @@ export async function cancelGroupDeleteAction(groupId, groupName) {
 
 export async function executeUserDeleteAction(userId, userName) {
   await requireAuth()
-  const ip = getIp()
+  const ip = await getIp()
   const sb = getSupabase()
   try {
     // Delete data with no ON DELETE CASCADE before removing the auth user,
@@ -174,7 +174,7 @@ export async function executeUserDeleteAction(userId, userName) {
 
 export async function deleteUserAction(userId, userName) {
   await requireAuth()
-  const ip = getIp()
+  const ip = await getIp()
   const sb = getSupabase()
   try {
     const scheduledAt = new Date(Date.now() + 72 * 60 * 60 * 1000).toISOString()
@@ -194,7 +194,7 @@ export async function deleteUserAction(userId, userName) {
 
 export async function cancelUserDeleteAction(userId, userName) {
   await requireAuth()
-  const ip = getIp()
+  const ip = await getIp()
   const sb = getSupabase()
   try {
     const { error } = await sb
@@ -239,7 +239,7 @@ export async function processPendingDeletionsAction() {
 
 export async function renameGroupAction(groupId, oldName, newName) {
   await requireAuth()
-  const ip = getIp()
+  const ip = await getIp()
   const { error } = await getSupabase()
     .from('community_groups').update({ name: newName }).eq('id', groupId)
   if (error) return { error: error.message }
@@ -249,7 +249,7 @@ export async function renameGroupAction(groupId, oldName, newName) {
 
 export async function editDisplayNameAction(userId, newName, oldName) {
   await requireAuth()
-  const ip = getIp()
+  const ip = await getIp()
   const { error } = await getSupabase()
     .from('profiles').update({ display_name: newName }).eq('user_id', userId)
   if (error) return { error: error.message }
@@ -259,7 +259,7 @@ export async function editDisplayNameAction(userId, newName, oldName) {
 
 export async function toggleRoleAction(userId, userName, newRole) {
   await requireAuth()
-  const ip = getIp()
+  const ip = await getIp()
   const { error } = await getSupabase()
     .from('profiles').update({ role: newRole }).eq('user_id', userId)
   if (error) return { error: error.message }
@@ -269,7 +269,7 @@ export async function toggleRoleAction(userId, userName, newRole) {
 
 export async function resetPasswordAction(email, userName) {
   await requireAuth()
-  const ip = getIp()
+  const ip = await getIp()
   const { error } = await getSupabase().auth.resetPasswordForEmail(email)
   if (error) return { error: error.message }
   await logAudit({ action: 'password_reset', targetType: 'user', targetLabel: userName, metadata: { email }, ip })
@@ -335,7 +335,7 @@ export async function searchUsersGlobalAction(query) {
 
 export async function deleteAllEmptyGroupsAction() {
   await requireAuth()
-  const ip = getIp()
+  const ip = await getIp()
   const sb = getSupabase()
   try {
     const { data: groups } = await sb
@@ -358,7 +358,7 @@ export async function deleteAllEmptyGroupsAction() {
 
 export async function deleteAllOrphanedUsersAction(orphanIds) {
   await requireAuth()
-  const ip = getIp()
+  const ip = await getIp()
   const sb = getSupabase()
 
   const succeeded = []
@@ -517,7 +517,7 @@ export async function loadAnnouncementsAction() {
 
 export async function publishAnnouncementAction(message) {
   await requireAuth()
-  const ip = getIp()
+  const ip = await getIp()
   const sb = getSupabase()
   await sb.from('announcements').update({ active: false }).eq('active', true)
   const { error } = await sb.from('announcements').insert({ message: message.trim() })
@@ -528,7 +528,7 @@ export async function publishAnnouncementAction(message) {
 
 export async function deactivateAnnouncementAction(id) {
   await requireAuth()
-  const ip = getIp()
+  const ip = await getIp()
   const sb = getSupabase()
   const { error } = await sb.from('announcements').update({ active: false }).eq('id', id)
   if (error) return { error: error.message }
@@ -539,7 +539,7 @@ export async function deactivateAnnouncementAction(id) {
 export async function broadcastPushAction({ groupId, userIds, title: rawTitle, body }) {
   const title = rawTitle?.trim() || 'Covey Space'
   await requireAuth()
-  const ip = getIp()
+  const ip = await getIp()
   try {
     const res = await fetch(`${process.env.SUPABASE_URL}/functions/v1/admin-broadcast-push`, {
       method: 'POST',

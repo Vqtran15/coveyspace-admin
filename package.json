@@ -15,9 +15,9 @@
     "@supabase/supabase-js": "^2.110.8",
     "framer-motion": "^12.42.2",
     "jose": "^6.2.4",
-    "next": "^14.2.0",
-    "react": "^18.3.0",
-    "react-dom": "^18.3.0",
+    "next": "^16.2.11",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
     "recharts": "^3.10.0",
     "resend": "^6.17.2"
   },
