@@ -6,7 +6,7 @@ import IdleLogout from '@/components/IdleLogout'
 
 export default async function DashboardPage() {
   await requireAuth()
-  const { data: groups = [] } = await loadGroups()
+  const { data: groups = [] } = await loadGroups().catch(() => ({ data: [] }))
 
   return (
     <>
