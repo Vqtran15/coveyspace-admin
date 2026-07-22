@@ -19,3 +19,14 @@
 .anim-slide-r-out { animation: slide-r-out 180ms ease-in  forwards }
 .anim-menu-in     { animation: menu-in     130ms ease-out forwards; transform-origin: top right }
 .anim-menu-out    { animation: menu-out    100ms ease-in  forwards; transform-origin: top right }
+
+@keyframes shimmer {
+  0%   { background-position: -200% 0 }
+  100% { background-position:  200% 0 }
+}
+.skeleton-shimmer {
+  background: linear-gradient(90deg, #f5f5f4 25%, #e9e6e3 50%, #f5f5f4 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+  border-radius: 6px;
+}

@@ -227,6 +227,67 @@ function ActivityList({ items, empty, renderRow }) {
   )
 }
 
+function SkeletonBar({ className = '', style }) {
+  return <div className={`skeleton-shimmer ${className}`} style={style} />
+}
+
+const skeletonCardVariants = {
+  hidden: { opacity: 0, y: 14 },
+  show:   { opacity: 1, y: 0, transition: { duration: 0.25, ease: 'easeOut' } },
+}
+
+function MetricsSkeletonGrid() {
+  return (
+    <motion.div
+      initial="hidden"
+      animate="show"
+      variants={{ show: { transition: { staggerChildren: 0.07 } } }}
+    >
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+        {[
+          [72, 88],
+          [80, 96],
+          [68, 72],
+          [80, 88],
+          [72, 80],
+        ].map(([labelW, numW], i) => (
+          <motion.div
+            key={i}
+            variants={skeletonCardVariants}
+            className="bg-white rounded-2xl border border-stone-100 px-5 py-4 shadow-sm"
+          >
+            <SkeletonBar className="h-2.5 mb-3" style={{ width: labelW }} />
+            <SkeletonBar className="h-8 mb-2" style={{ width: numW, animationDelay: `${i * 0.12}s` }} />
+            <SkeletonBar className="h-2.5" style={{ width: 52 }} />
+          </motion.div>
+        ))}
+      </div>
+
+      <motion.div
+        variants={skeletonCardVariants}
+        className="bg-white rounded-2xl border border-stone-100 shadow-sm overflow-hidden"
+      >
+        <div className="border-b border-stone-100 px-4 py-3 flex gap-8">
+          {[72, 56, 56, 72, 72].map((w, i) => (
+            <SkeletonBar key={i} className="h-2.5" style={{ width: w }} />
+          ))}
+        </div>
+        {[...Array(5)].map((_, i) => (
+          <div key={i} className="border-b border-stone-50 last:border-0 px-4 py-3.5 flex gap-8 items-center">
+            {[140, 40, 48, 60, 60].map((w, j) => (
+              <SkeletonBar
+                key={j}
+                className="h-2.5"
+                style={{ width: w, animationDelay: `${(i * 0.08 + j * 0.04).toFixed(2)}s` }}
+              />
+            ))}
+          </div>
+        ))}
+      </motion.div>
+    </motion.div>
+  )
+}
+
 function exportCSV(groupName, members) {
   const headers = ['Name', 'Email', 'Role', 'Last Activity', 'Last Logged In', 'Joined']
   const rows = members.map(m => [
@@ -1240,9 +1301,7 @@ export default function DashboardClient({ initialGroups }) {
               </div>
 
               {loadingMetrics && !metrics ? (
-                <div className="flex items-center justify-center py-24 text-stone-400">
-                  <p className="text-sm">Loading…</p>
-                </div>
+                <MetricsSkeletonGrid />
               ) : metrics ? (
                 <>
                   {overviewTab === 'overview' && (() => {
@@ -1255,17 +1314,24 @@ export default function DashboardClient({ initialGroups }) {
                       { label: 'Messages',       value: metrics.messagesInPeriod.toLocaleString(),     sub: periodLabel },
                       { label: 'New Groups',     value: `+${metrics.newGroupsInPeriod}`,              sub: periodLabel },
                       { label: 'New Members',    value: `+${metrics.newMembersInPeriod}`,             sub: periodLabel },
-                    ].map(({ label, value, sub }) => (
+                    ].map(({ label, value, sub }, i) => (
                       <div key={label} className="bg-white rounded-2xl border border-stone-100 px-5 py-4 shadow-sm">
                         <p className="text-xs font-semibold text-stone-400 uppercase tracking-wider mb-1">{label}</p>
-                        <p className="text-3xl font-bold text-stone-800">{value}</p>
-                        {sub && <p className="text-xs text-stone-400 mt-0.5">{sub}</p>}
+                        {loadingMetrics
+                          ? <SkeletonBar className="h-8 mt-1 mb-2" style={{ width: 80 + (i % 3) * 16, animationDelay: `${i * 0.1}s` }} />
+                          : <p className="text-3xl font-bold text-stone-800">{value}</p>
+                        }
+                        {sub && (loadingMetrics
+                          ? <SkeletonBar className="h-2.5 mt-0.5" style={{ width: 56 }} />
+                          : <p className="text-xs text-stone-400 mt-0.5">{sub}</p>
+                        )}
                       </div>
                     ))}
                   </div>
 
                   {/* Sortable group table */}
                   {sortedGroupStats.length > 0 && (() => {
+                    const tableClass = loadingMetrics ? 'opacity-40 pointer-events-none transition-opacity duration-300' : 'transition-opacity duration-300'
                     const SortTh = ({ col, label, right = false }) => {
                       const active = groupSort.col === col
                       return (
@@ -1278,7 +1344,7 @@ export default function DashboardClient({ initialGroups }) {
                       )
                     }
                     return (
-                      <div className="bg-white rounded-2xl border border-stone-100 shadow-sm overflow-x-auto">
+                      <div className={`bg-white rounded-2xl border border-stone-100 shadow-sm overflow-x-auto ${tableClass}`}>
                         <table className="w-full">
                           <thead className="border-b border-stone-100">
                             <tr>
