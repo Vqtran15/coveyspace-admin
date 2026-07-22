@@ -12,13 +12,13 @@
     "@emoji-mart/react": "^1.1.1",
     "@google-analytics/data": "^6.1.0",
     "@phosphor-icons/react": "^2.1.10",
-    "@supabase/supabase-js": "^2.39.0",
+    "@supabase/supabase-js": "^2.110.8",
     "framer-motion": "^12.42.2",
-    "jose": "^5.2.0",
+    "jose": "^6.2.4",
     "next": "^14.2.0",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
-    "recharts": "^3.9.2",
+    "recharts": "^3.10.0",
     "resend": "^6.17.2"
   },
   "devDependencies": {
