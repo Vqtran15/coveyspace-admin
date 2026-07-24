@@ -20,6 +20,11 @@ Admin dashboard for the Covey Space community platform.
 - `src/components/DashboardClient.jsx` — main dashboard UI (Overview tab, skeleton loading, metrics)
 - `src/app/globals.css` — global CSS including `.skeleton-shimmer` keyframe animation
 
+## Related Projects
+
+### meal-rotation (`~/meal-rotation`)
+React PWA at `coveyspace.com`. Same Supabase project (`ktmlyzwpgvhrwfgyoeiq`). When new feature flags (`*_enabled`) are added to `group_settings` there, add a matching entry to the `flags` array in `src/components/DashboardClient.jsx` → `FeatureFlags` so the dashboard reflects the new toggle.
+
 ## Known Quirks
 - `.npmrc` has `legacy-peer-deps=true` — required because `@emoji-mart/react@1.1.1` declares peer dep on React `^16.8||^17||^18` but the project is on React 19. Do not remove this.
 - `src/app/dashboard/page.jsx` wraps `loadGroups()` in `.catch(() => ({ data: [] }))` so the dashboard shell renders even when Supabase is unreachable.

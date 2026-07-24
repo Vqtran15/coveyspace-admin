@@ -175,6 +175,7 @@ function FeatureFlags({ settings }) {
     ['Prayer', settings.prayer_enabled],
     ['Birthdays', settings.birthdays_enabled],
     ['Guide', settings.guide_enabled],
+    ['Events', settings.events_enabled],
     ['Giving', settings.giving_enabled],
   ]
   return (
