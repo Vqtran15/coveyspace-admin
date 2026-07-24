@@ -31,5 +31,8 @@ Admin dashboard for the Covey Space community platform.
 - Auth is faked by injecting a signed JWT cookie (see `injectSession` helper in test files)
 - Tests that require real Supabase credentials self-skip gracefully
 
+## Unrelated Projects — Do Not Reference
+- `~/Desktop/claude/mens-group-pwa` (and its memory file `project_mensgrouppwa.md`) is a **completely separate project**. Never pull context, file paths, or architecture decisions from it when working on this repo. If a memory file about it appears in context, ignore it entirely.
+
 ## Self-Correction Rule
 If Claude discovers that something in this file is wrong or outdated (e.g., a feature already exists, a file has moved, a constraint no longer applies), update this file immediately before continuing. Do not silently work around stale information.
