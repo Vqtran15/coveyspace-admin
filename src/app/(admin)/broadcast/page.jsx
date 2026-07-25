@@ -4,6 +4,6 @@ import BroadcastClient from '@/components/BroadcastClient'
 
 export default async function BroadcastPage() {
   await requireAuth()
-  const { data: history = [] } = await loadBroadcastHistoryAction()
+  const { data: history = [] } = await loadBroadcastHistoryAction().catch(() => ({ data: [] }))
   return <BroadcastClient initialHistory={history} />
 }
