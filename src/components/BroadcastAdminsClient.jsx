@@ -102,11 +102,11 @@ export default function BroadcastAdminsClient({ initialHistory }) {
   const canSend = bodyLen > 0 && bodyLen <= 200 && titleLen <= 50 && !isPending
 
   return (
-    <div className="h-full flex flex-col bg-violet-50">
-      <div className="bg-white border-b border-violet-100 px-6 py-4 shrink-0">
+    <div className="h-full flex flex-col bg-lagoon-50">
+      <div className="bg-white border-b border-lagoon-100 px-6 py-4 shrink-0">
         <div className="flex items-center gap-2">
           <h1 className="text-base font-semibold text-stone-800">Broadcast to Admins</h1>
-          <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-violet-100 text-violet-700 text-xs font-semibold">
+          <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-lagoon-100 text-lagoon-700 text-xs font-semibold">
             <Shield size={11} weight="fill" />
             Admins only
           </span>
@@ -119,7 +119,7 @@ export default function BroadcastAdminsClient({ initialHistory }) {
 
           {/* Compose */}
           <div>
-            <div className="bg-white rounded-2xl border border-violet-200 p-5 space-y-4">
+            <div className="bg-white rounded-2xl border border-lagoon-200 p-5 space-y-4">
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <label className="block text-xs font-semibold text-stone-500 uppercase tracking-wider">Title</label>
@@ -132,7 +132,7 @@ export default function BroadcastAdminsClient({ initialHistory }) {
                   onChange={e => setTitle(e.target.value)}
                   onFocus={() => { activeFieldRef.current = 'title' }}
                   placeholder="e.g. New Feature Available"
-                  className="w-full text-sm text-stone-800 border border-stone-200 rounded-xl px-3 py-2.5 outline-none focus:border-violet-500 transition-colors"
+                  className="w-full text-sm text-stone-800 border border-stone-200 rounded-xl px-3 py-2.5 outline-none focus:border-lagoon transition-colors"
                 />
                 <p className="text-xs text-stone-400 mt-1">Optional — defaults to "Covey Space" if left blank</p>
               </div>
@@ -148,7 +148,7 @@ export default function BroadcastAdminsClient({ initialHistory }) {
                   onFocus={() => { activeFieldRef.current = 'body' }}
                   placeholder="e.g. Events & Polls are now available — enable them in your Admin settings."
                   rows={4}
-                  className="w-full text-sm text-stone-800 border border-stone-200 rounded-xl px-3 py-2.5 resize-none outline-none focus:border-violet-500 transition-colors"
+                  className="w-full text-sm text-stone-800 border border-stone-200 rounded-xl px-3 py-2.5 resize-none outline-none focus:border-lagoon transition-colors"
                 />
               </div>
               <div className="flex items-center justify-between">
@@ -173,7 +173,7 @@ export default function BroadcastAdminsClient({ initialHistory }) {
                 <button
                   onClick={handleSend}
                   disabled={!canSend}
-                  className="px-4 py-2 text-sm font-semibold bg-violet-600 text-white rounded-xl hover:bg-violet-700 transition-colors disabled:opacity-40"
+                  className="px-4 py-2 text-sm font-semibold bg-lagoon text-white rounded-xl hover:bg-lagoon-600 transition-colors disabled:opacity-40"
                 >
                   {isPending ? 'Sending…' : 'Send to Admins'}
                 </button>
@@ -194,7 +194,7 @@ export default function BroadcastAdminsClient({ initialHistory }) {
             ) : (
               <div className="flex flex-col gap-3">
                 {history.map(entry => (
-                  <div key={entry.id} className="bg-white rounded-2xl border border-violet-100 px-5 py-4">
+                  <div key={entry.id} className="bg-white rounded-2xl border border-lagoon-100 px-5 py-4">
                     {entry.metadata?.title && (
                       <p className="text-xs font-semibold text-stone-500 mb-0.5">{entry.metadata.title}</p>
                     )}
@@ -206,7 +206,7 @@ export default function BroadcastAdminsClient({ initialHistory }) {
                       {entry.metadata?.sent != null && (
                         <>
                           <span className="text-stone-200">·</span>
-                          <span className="text-xs text-violet-600 font-medium">
+                          <span className="text-xs text-lagoon-700 font-medium">
                             {entry.metadata.sent} delivered
                             {entry.metadata.stale > 0 && `, ${entry.metadata.stale} stale`}
                           </span>
