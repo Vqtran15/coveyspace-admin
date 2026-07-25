@@ -615,6 +615,59 @@ export async function loadBroadcastHistoryAction({ limit = 30 } = {}) {
   return { data: data ?? [] }
 }
 
+export async function broadcastAdminsPushAction({ title: rawTitle, body }) {
+  const title = rawTitle?.trim() || 'Covey Space'
+  await requireAuth()
+  const ip = await getIp()
+  const sb = getSupabase()
+  try {
+    const { data: adminProfiles, error: pErr } = await sb
+      .from('profiles')
+      .select('user_id')
+      .eq('role', 'admin')
+    if (pErr) return { error: pErr.message }
+    const userIds = (adminProfiles ?? []).map(p => p.user_id)
+    if (!userIds.length) return { error: 'No admin users found' }
+
+    const res = await fetch(`${process.env.SUPABASE_URL}/functions/v1/admin-broadcast-push`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
+      },
+      body: JSON.stringify({ user_ids: userIds, title, body, url: '/' }),
+    })
+    if (!res.ok) {
+      const text = await res.text()
+      return { error: `Function error (${res.status}): ${text}` }
+    }
+    const result = await res.json()
+    await logAudit({
+      action: 'broadcast_push',
+      targetType: 'admins',
+      targetLabel: `[Admins] ${body.slice(0, 80)}`,
+      metadata: { title: rawTitle?.trim() || null, body, sent: result.sent, stale: result.stale, admin_count: userIds.length },
+      ip,
+    })
+    return { success: true, sent: result.sent ?? 0, adminCount: userIds.length }
+  } catch (e) {
+    return { error: e.message }
+  }
+}
+
+export async function loadAdminsBroadcastHistoryAction({ limit = 30 } = {}) {
+  await requireAuth()
+  const { data, error } = await getSupabase()
+    .from('admin_audit_log')
+    .select('id, performed_at, target_label, metadata')
+    .eq('action', 'broadcast_push')
+    .eq('target_type', 'admins')
+    .order('performed_at', { ascending: false })
+    .limit(limit)
+  if (error) return { error: error.message, data: [] }
+  return { data: data ?? [] }
+}
+
 export async function loadAuditLog() {
   await requireAuth()
   const { data, error } = await getSupabase()

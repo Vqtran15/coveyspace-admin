@@ -15,6 +15,7 @@ import {
   CaretRight,
   SignOut,
   MagnifyingGlass,
+  Shield,
 } from '@phosphor-icons/react'
 import { logoutAction } from '@/actions/auth'
 
@@ -74,6 +75,7 @@ export default function AdminNav({
     if (view === 'audit') return pathname === '/audit'
     if (view === 'errors') return pathname === '/errors'
     if (view === 'broadcast') return pathname === '/broadcast'
+    if (view === 'broadcast-admins') return pathname === '/broadcast-admins'
     if (view === 'search') return pathname === '/dashboard' && activeView === 'search'
     return pathname === '/dashboard' && activeView === view
   }
@@ -155,6 +157,14 @@ export default function AdminNav({
           label="Broadcast to All"
           sublabel="Push to every group"
           active={isActive('broadcast')}
+          collapsed={collapsed}
+        />
+        <NavItem
+          href="/broadcast-admins"
+          icon={Shield}
+          label="Broadcast to Admins"
+          sublabel="Push to admin users only"
+          active={isActive('broadcast-admins')}
           collapsed={collapsed}
         />
         <NavItem
