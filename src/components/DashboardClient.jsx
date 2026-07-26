@@ -177,6 +177,7 @@ function FeatureFlags({ settings }) {
     ['Guide', settings.guide_enabled],
     ['Events', settings.events_enabled],
     ['Giving', settings.giving_enabled],
+    ['Bible', settings.bible_enabled],
   ]
   return (
     <div className="flex gap-1.5 flex-wrap">
