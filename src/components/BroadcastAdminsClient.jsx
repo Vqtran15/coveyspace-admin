@@ -99,7 +99,7 @@ export default function BroadcastAdminsClient({ initialHistory }) {
 
   const titleLen = title.trim().length
   const bodyLen = draft.trim().length
-  const canSend = bodyLen > 0 && bodyLen <= 200 && titleLen <= 50 && !isPending
+  const canSend = bodyLen > 0 && bodyLen <= 140 && titleLen <= 50 && !isPending
 
   return (
     <div className="h-full flex flex-col bg-lagoon-50">
@@ -139,7 +139,7 @@ export default function BroadcastAdminsClient({ initialHistory }) {
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <label className="block text-xs font-semibold text-stone-500 uppercase tracking-wider">Message</label>
-                  <span className={`text-xs ${bodyLen > 200 ? 'text-red-500' : 'text-stone-400'}`}>{bodyLen}/200</span>
+                  <span className={`text-xs ${bodyLen > 140 ? 'text-red-500' : 'text-stone-400'}`}>{bodyLen}/140</span>
                 </div>
                 <textarea
                   ref={bodyRef}
