@@ -379,6 +379,7 @@ export default function DashboardClient({ initialGroups }) {
   const [globalQuery, setGlobalQuery] = useState('')
   const [allGlobalUsers, setAllGlobalUsers] = useState(null)
   const [loadingAllGlobal, setLoadingAllGlobal] = useState(false)
+  const [searchSort, setSearchSort] = useState({ col: 'group_name', dir: 'asc' })
 
   const [broadcastTarget, setBroadcastTarget] = useState(null) // null | 'all' | 'selected' | groupId string
   const [broadcastGroupName, setBroadcastGroupName] = useState('')
@@ -726,14 +727,22 @@ export default function DashboardClient({ initialGroups }) {
 
   const displayedGlobalResults = useMemo(() => {
     if (!allGlobalUsers) return null
-    if (!globalQuery.trim()) return allGlobalUsers
-    const q = globalQuery.trim().toLowerCase()
-    return allGlobalUsers.filter(u =>
-      u.display_name?.toLowerCase().includes(q) ||
-      u.email?.toLowerCase().includes(q) ||
-      u.group_name?.toLowerCase().includes(q)
-    )
-  }, [allGlobalUsers, globalQuery])
+    let list = allGlobalUsers
+    if (globalQuery.trim()) {
+      const q = globalQuery.trim().toLowerCase()
+      list = list.filter(u =>
+        u.display_name?.toLowerCase().includes(q) ||
+        u.email?.toLowerCase().includes(q) ||
+        u.group_name?.toLowerCase().includes(q)
+      )
+    }
+    const { col, dir } = searchSort
+    return [...list].sort((a, b) => {
+      const av = a[col] ?? '', bv = b[col] ?? ''
+      const cmp = av < bv ? -1 : av > bv ? 1 : 0
+      return dir === 'desc' ? -cmp : cmp
+    })
+  }, [allGlobalUsers, globalQuery, searchSort])
 
   // --- Group actions ---
   async function handleDeleteGroup(group) {
@@ -790,6 +799,7 @@ export default function DashboardClient({ initialGroups }) {
           const r = await deleteUserAction(member.id, member.display_name || member.email)
           if (r.error) { showToast(r.error, 'error'); return }
           setMembers(ms => ms.map(m => m.id === member.id ? { ...m, scheduled_delete_at: r.scheduled_delete_at } : m))
+          setAllGlobalUsers(prev => prev?.map(u => u.id === member.id ? { ...u, scheduled_delete_at: r.scheduled_delete_at } : u) ?? prev)
           showToast(`Deletion of "${member.display_name || member.email}" scheduled — 72 hours to cancel`)
         })
       },
@@ -802,6 +812,7 @@ export default function DashboardClient({ initialGroups }) {
       const r = await cancelUserDeleteAction(member.id, member.display_name || member.email)
       if (r.error) { showToast(r.error, 'error'); return }
       setMembers(ms => ms.map(m => m.id === member.id ? { ...m, scheduled_delete_at: null } : m))
+      setAllGlobalUsers(prev => prev?.map(u => u.id === member.id ? { ...u, scheduled_delete_at: null } : u) ?? prev)
       showToast('Deletion cancelled')
     })
   }
@@ -815,6 +826,7 @@ export default function DashboardClient({ initialGroups }) {
           const r = await executeUserDeleteAction(member.id, member.display_name || member.email)
           if (r.error) { showToast(r.error, 'error'); return }
           setMembers(ms => ms.filter(m => m.id !== member.id))
+          setAllGlobalUsers(prev => prev?.filter(u => u.id !== member.id) ?? prev)
           setGroups(gs => gs.map(g =>
             g.id === selectedGroup?.id ? { ...g, member_count: (g.member_count || 1) - 1 } : g
           ))
@@ -835,6 +847,7 @@ export default function DashboardClient({ initialGroups }) {
           const r = await toggleRoleAction(member.id, member.display_name || member.email, newRole)
           if (r.error) { showToast(r.error, 'error'); return }
           setMembers(ms => ms.map(m => m.id === member.id ? { ...m, role: newRole } : m))
+          setAllGlobalUsers(prev => prev?.map(u => u.id === member.id ? { ...u, role: newRole } : u) ?? prev)
           showToast(`Updated role to ${newRole}`)
         })
       }
@@ -879,6 +892,7 @@ export default function DashboardClient({ initialGroups }) {
       if (r.error) { showToast(r.error, 'error') }
       else {
         setMembers(ms => ms.map(m => m.id === id ? { ...m, display_name: value.trim() } : m))
+        setAllGlobalUsers(prev => prev?.map(u => u.id === id ? { ...u, display_name: value.trim() } : u) ?? prev)
         showToast(`Updated name to "${value.trim()}"`)
       }
     }
@@ -1209,56 +1223,117 @@ export default function DashboardClient({ initialGroups }) {
                 </div>
               )}
 
-              {!loadingAllGlobal && displayedGlobalResults?.length > 0 && (
-                <div className="bg-white rounded-2xl border border-stone-200 overflow-x-auto">
-                  <div className="px-5 py-3 border-b border-stone-100 bg-stone-50 flex items-center justify-between">
-                    <p className="text-xs text-stone-400">
-                      {displayedGlobalResults.length} user{displayedGlobalResults.length !== 1 ? 's' : ''}
-                      {globalQuery.trim() && allGlobalUsers && ` of ${allGlobalUsers.length} total`}
-                    </p>
-                    <button
-                      onClick={() => exportSearchCSV(displayedGlobalResults, globalQuery)}
-                      className="px-3 py-1 text-xs font-medium rounded-lg bg-stone-100 text-stone-600 hover:bg-stone-200 transition-colors"
+              {!loadingAllGlobal && displayedGlobalResults?.length > 0 && (() => {
+                const SortTh = ({ col, label }) => {
+                  const active = searchSort.col === col
+                  return (
+                    <th
+                      onClick={() => setSearchSort(s => ({ col, dir: s.col === col && s.dir === 'asc' ? 'desc' : 'asc' }))}
+                      className={`text-left px-5 py-3 text-xs font-semibold uppercase tracking-wider cursor-pointer select-none whitespace-nowrap transition-colors ${active ? 'text-stone-700' : 'text-stone-400 hover:text-stone-600'}`}
                     >
-                      Export CSV
-                    </button>
-                  </div>
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-stone-100">
-                        <th className="text-left px-5 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">Name</th>
-                        <th className="text-left px-5 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">Email</th>
-                        <th className="text-left px-5 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">Group</th>
-                        <th className="text-left px-5 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">Role</th>
-                        <th className="text-left px-5 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">Last Sign In</th>
-                        <th className="px-5 py-3 w-24"></th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-stone-50">
-                      {displayedGlobalResults.map(user => (
-                        <tr key={user.id} className="hover:bg-stone-50 transition-colors">
-                          <td className="px-5 py-3 font-medium text-stone-800">{user.display_name || <span className="text-stone-400 italic">No name</span>}</td>
-                          <td className="px-5 py-3 text-stone-500">{user.email || '—'}</td>
-                          <td className="px-5 py-3 text-stone-600">{user.group_name}</td>
-                          <td className="px-5 py-3"><Badge role={user.role} /></td>
-                          <td className="px-5 py-3 text-xs text-stone-400 whitespace-nowrap">{formatTime(user.last_sign_in_at)}</td>
-                          <td className="px-5 py-3">
-                            <button
-                              onClick={() => {
-                                const group = groups.find(g => g.id === user.group_id)
-                                if (group) selectGroup(group)
-                              }}
-                              className="px-2 py-0.5 rounded-md text-xs font-medium bg-jade/10 text-jade hover:bg-jade/20 transition-colors whitespace-nowrap"
-                            >
-                              View Group
-                            </button>
-                          </td>
+                      {label}{active ? (searchSort.dir === 'asc' ? ' ↑' : ' ↓') : ''}
+                    </th>
+                  )
+                }
+                return (
+                  <div className="bg-white rounded-2xl border border-stone-200 overflow-x-auto">
+                    <div className="px-5 py-3 border-b border-stone-100 bg-stone-50 flex items-center justify-between">
+                      <p className="text-xs text-stone-400">
+                        {displayedGlobalResults.length} user{displayedGlobalResults.length !== 1 ? 's' : ''}
+                        {globalQuery.trim() && allGlobalUsers && ` of ${allGlobalUsers.length} total`}
+                      </p>
+                      <button
+                        onClick={() => exportSearchCSV(displayedGlobalResults, globalQuery)}
+                        className="px-3 py-1 text-xs font-medium rounded-lg bg-stone-100 text-stone-600 hover:bg-stone-200 transition-colors"
+                      >
+                        Export CSV
+                      </button>
+                    </div>
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-stone-100">
+                          <SortTh col="display_name" label="Name" />
+                          <SortTh col="email" label="Email" />
+                          <SortTh col="group_name" label="Group" />
+                          <SortTh col="role" label="Role" />
+                          <SortTh col="last_sign_in_at" label="Last Sign In" />
+                          <th className="px-5 py-3 w-32"></th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+                      </thead>
+                      <tbody className="divide-y divide-stone-50">
+                        {displayedGlobalResults.map(user => (
+                          <tr key={user.id} className="hover:bg-stone-50 transition-colors group">
+                            <td className="px-5 py-3 font-medium text-stone-800">
+                              {editingName?.id === user.id && editingName.type === 'user' ? (
+                                <input
+                                  autoFocus
+                                  value={editingName.value}
+                                  onChange={e => setEditingName(n => ({ ...n, value: e.target.value }))}
+                                  onKeyDown={e => { if (e.key === 'Enter') submitRename(); if (e.key === 'Escape') setEditingName(null) }}
+                                  onBlur={submitRename}
+                                  disabled={renaming}
+                                  className="text-sm font-medium text-stone-800 border-b border-jade outline-none bg-transparent w-full"
+                                />
+                              ) : (
+                                <span
+                                  className="cursor-pointer hover:text-jade transition-colors"
+                                  onClick={() => startRename(user.id, user.display_name || '', 'user')}
+                                  title="Click to edit name"
+                                >
+                                  {user.display_name || <span className="text-stone-400 italic">No name</span>}
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-5 py-3 text-stone-500">{user.email || '—'}</td>
+                            <td className="px-5 py-3 text-stone-600">
+                              <button
+                                onClick={() => { const g = groups.find(g => g.id === user.group_id); if (g) selectGroup(g) }}
+                                className="hover:text-jade transition-colors"
+                              >
+                                {user.group_name}
+                              </button>
+                            </td>
+                            <td className="px-5 py-3">
+                              <button onClick={() => handleToggleRole(user)} title="Click to toggle role">
+                                <Badge role={user.role} />
+                              </button>
+                            </td>
+                            <td className="px-5 py-3 text-xs text-stone-400 whitespace-nowrap">
+                              {formatTime(user.last_sign_in_at)}
+                              {user.scheduled_delete_at && (
+                                <div className="flex items-center gap-1.5 mt-0.5">
+                                  <span className="text-[11px] font-medium text-amber-600">⏳ Deletes {timeUntil(user.scheduled_delete_at)}</span>
+                                  <button onClick={() => handleCancelUserDelete(user)} className="text-[11px] text-stone-400 underline hover:text-stone-600">Cancel</button>
+                                  <span className="text-stone-300 text-[10px]">·</span>
+                                  <button onClick={() => handleOverrideUserDelete(user)} className="text-[11px] text-red-400 underline hover:text-red-600">Delete now</button>
+                                </div>
+                              )}
+                            </td>
+                            <td className="px-5 py-3">
+                              <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity justify-end">
+                                <button
+                                  onClick={() => { const g = groups.find(g => g.id === user.group_id); if (g) selectGroup(g) }}
+                                  className="px-2 py-0.5 rounded-md text-xs font-medium bg-jade/10 text-jade hover:bg-jade/20 transition-colors whitespace-nowrap"
+                                >
+                                  View Group
+                                </button>
+                                {!user.scheduled_delete_at && (
+                                  <button
+                                    onClick={() => handleDeleteUser(user)}
+                                    className="px-2 py-0.5 rounded-md text-xs font-medium bg-red-50 text-red-500 hover:bg-red-100 transition-colors"
+                                  >
+                                    Delete
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )
+              })()}
             </div>
           )}
 
