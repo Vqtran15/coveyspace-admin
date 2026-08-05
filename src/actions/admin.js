@@ -333,6 +333,32 @@ export async function searchUsersGlobalAction(query) {
   return { data: results }
 }
 
+export async function loadAllUsersGlobalAction() {
+  await requireAuth()
+  const sb = getSupabase()
+  const [{ users: authUsers, error: aErr }, { data: profiles, error: pErr }, { data: groups }] = await Promise.all([
+    listAllUsers(sb),
+    sb.from('profiles').select('user_id, display_name, role, community_group_id, created_at'),
+    sb.from('community_groups').select('id, name'),
+  ])
+  if (aErr || pErr) return { error: (aErr || pErr).message }
+  const authMap = Object.fromEntries((authUsers ?? []).map(u => [u.id, u]))
+  const groupMap = Object.fromEntries((groups ?? []).map(g => [g.id, g.name]))
+  const results = (profiles ?? [])
+    .map(p => ({
+      id: p.user_id,
+      display_name: p.display_name,
+      role: p.role,
+      email: authMap[p.user_id]?.email ?? '',
+      group_id: p.community_group_id,
+      group_name: groupMap[p.community_group_id] ?? 'Unknown',
+      created_at: p.created_at,
+      last_sign_in_at: authMap[p.user_id]?.last_sign_in_at ?? null,
+    }))
+    .sort((a, b) => (a.group_name ?? '').localeCompare(b.group_name ?? ''))
+  return { data: results }
+}
+
 export async function deleteAllEmptyGroupsAction() {
   await requireAuth()
   const ip = await getIp()

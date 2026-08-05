@@ -22,6 +22,7 @@ import {
   toggleRoleAction,
   resetPasswordAction,
   searchUsersGlobalAction,
+  loadAllUsersGlobalAction,
   deleteAllEmptyGroupsAction,
   deleteAllOrphanedUsersAction,
   broadcastPushAction,
@@ -312,6 +313,28 @@ function exportCSV(groupName, members) {
   URL.revokeObjectURL(url)
 }
 
+function exportSearchCSV(users, query) {
+  const headers = ['Name', 'Email', 'Group', 'Role', 'Last Sign In', 'Joined']
+  const rows = users.map(u => [
+    u.display_name ?? '',
+    u.email ?? '',
+    u.group_name ?? '',
+    u.role ?? '',
+    u.last_sign_in_at ? new Date(u.last_sign_in_at).toLocaleString() : '',
+    u.created_at ? new Date(u.created_at).toLocaleString() : '',
+  ])
+  const csv = [headers, ...rows]
+    .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+    .join('\n')
+  const blob = new Blob([csv], { type: 'text/csv' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = query.trim() ? `users_${query.trim().replace(/[^a-z0-9]/gi, '_')}.csv` : 'all_users.csv'
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 export default function DashboardClient({ initialGroups }) {
   const searchParams = useSearchParams()
   const [groups, setGroups] = useState(initialGroups)
@@ -354,8 +377,8 @@ export default function DashboardClient({ initialGroups }) {
 
   const [showGlobalSearch, setShowGlobalSearch] = useState(false)
   const [globalQuery, setGlobalQuery] = useState('')
-  const [globalResults, setGlobalResults] = useState(null)
-  const [loadingGlobal, setLoadingGlobal] = useState(false)
+  const [allGlobalUsers, setAllGlobalUsers] = useState(null)
+  const [loadingAllGlobal, setLoadingAllGlobal] = useState(false)
 
   const [broadcastTarget, setBroadcastTarget] = useState(null) // null | 'all' | 'selected' | groupId string
   const [broadcastGroupName, setBroadcastGroupName] = useState('')
@@ -545,7 +568,7 @@ export default function DashboardClient({ initialGroups }) {
     showToast('Banner deactivated')
   }
 
-  function handleSelectGlobalSearch() {
+  async function handleSelectGlobalSearch() {
     setSelectedGroup(null)
     setMembers([])
     setSearch('')
@@ -554,18 +577,14 @@ export default function DashboardClient({ initialGroups }) {
     setShowMetrics(false)
     setShowGroups(false)
     setShowGlobalSearch(true)
-    setGlobalResults(null)
+    setAllGlobalUsers(null)
     setGlobalQuery('')
+    setLoadingAllGlobal(true)
     setTimeout(() => globalInputRef.current?.focus(), 50)
-  }
-
-  async function handleGlobalSearch() {
-    if (!globalQuery.trim()) return
-    setLoadingGlobal(true)
-    const { data, error } = await searchUsersGlobalAction(globalQuery)
+    const { data, error } = await loadAllUsersGlobalAction()
     if (error) showToast(error, 'error')
-    else setGlobalResults(data || [])
-    setLoadingGlobal(false)
+    else setAllGlobalUsers(data || [])
+    setLoadingAllGlobal(false)
   }
 
   async function handleDeleteOrphan(user) {
@@ -704,6 +723,17 @@ export default function DashboardClient({ initialGroups }) {
       m.email?.toLowerCase().includes(q)
     )
   }, [members, search])
+
+  const displayedGlobalResults = useMemo(() => {
+    if (!allGlobalUsers) return null
+    if (!globalQuery.trim()) return allGlobalUsers
+    const q = globalQuery.trim().toLowerCase()
+    return allGlobalUsers.filter(u =>
+      u.display_name?.toLowerCase().includes(q) ||
+      u.email?.toLowerCase().includes(q) ||
+      u.group_name?.toLowerCase().includes(q)
+    )
+  }, [allGlobalUsers, globalQuery])
 
   // --- Group actions ---
   async function handleDeleteGroup(group) {
@@ -1156,43 +1186,42 @@ export default function DashboardClient({ initialGroups }) {
           {showGlobalSearch && (
             <div className="max-w-6xl mx-auto">
               <div className="mb-4">
-                <h2 className="text-base font-semibold text-stone-800 mb-3">Global Search</h2>
-                <div className="flex gap-2">
-                  <input
-                    ref={globalInputRef}
-                    type="text"
-                    value={globalQuery}
-                    onChange={e => setGlobalQuery(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && handleGlobalSearch()}
-                    placeholder="Search by name or email across all groups…"
-                    className="flex-1 border border-stone-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-jade/50"
-                  />
-                  <button
-                    onClick={handleGlobalSearch}
-                    disabled={!globalQuery.trim() || loadingGlobal}
-                    className="px-4 py-2.5 text-sm font-medium rounded-xl bg-jade text-white hover:opacity-90 transition-colors disabled:opacity-40"
-                  >
-                    {loadingGlobal ? 'Searching…' : 'Search'}
-                  </button>
-                </div>
+                <h2 className="text-base font-semibold text-stone-800 mb-3">Search</h2>
+                <input
+                  ref={globalInputRef}
+                  type="text"
+                  value={globalQuery}
+                  onChange={e => setGlobalQuery(e.target.value)}
+                  placeholder="Filter by name, email, or group…"
+                  className="w-full border border-stone-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-jade/50"
+                />
               </div>
 
-              {globalResults === null && !loadingGlobal && (
-                <div className="bg-white rounded-2xl border border-stone-100 py-12 text-center text-stone-400">
-                  <p className="text-sm">Enter a name or email to search</p>
+              {loadingAllGlobal && (
+                <div className="flex items-center justify-center py-16 text-stone-400">
+                  <p className="text-sm">Loading users…</p>
                 </div>
               )}
 
-              {globalResults?.length === 0 && (
+              {!loadingAllGlobal && displayedGlobalResults?.length === 0 && (
                 <div className="bg-white rounded-2xl border border-stone-100 py-12 text-center text-stone-400">
-                  <p className="text-sm">No matching users found</p>
+                  <p className="text-sm">{globalQuery.trim() ? 'No matching users found' : 'No users found'}</p>
                 </div>
               )}
 
-              {globalResults?.length > 0 && (
+              {!loadingAllGlobal && displayedGlobalResults?.length > 0 && (
                 <div className="bg-white rounded-2xl border border-stone-200 overflow-x-auto">
-                  <div className="px-5 py-3 border-b border-stone-100 bg-stone-50">
-                    <p className="text-xs text-stone-400">{globalResults.length} result{globalResults.length !== 1 ? 's' : ''}</p>
+                  <div className="px-5 py-3 border-b border-stone-100 bg-stone-50 flex items-center justify-between">
+                    <p className="text-xs text-stone-400">
+                      {displayedGlobalResults.length} user{displayedGlobalResults.length !== 1 ? 's' : ''}
+                      {globalQuery.trim() && allGlobalUsers && ` of ${allGlobalUsers.length} total`}
+                    </p>
+                    <button
+                      onClick={() => exportSearchCSV(displayedGlobalResults, globalQuery)}
+                      className="px-3 py-1 text-xs font-medium rounded-lg bg-stone-100 text-stone-600 hover:bg-stone-200 transition-colors"
+                    >
+                      Export CSV
+                    </button>
                   </div>
                   <table className="w-full text-sm">
                     <thead>
@@ -1206,7 +1235,7 @@ export default function DashboardClient({ initialGroups }) {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-stone-50">
-                      {globalResults.map(user => (
+                      {displayedGlobalResults.map(user => (
                         <tr key={user.id} className="hover:bg-stone-50 transition-colors">
                           <td className="px-5 py-3 font-medium text-stone-800">{user.display_name || <span className="text-stone-400 italic">No name</span>}</td>
                           <td className="px-5 py-3 text-stone-500">{user.email || '—'}</td>
