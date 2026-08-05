@@ -338,7 +338,7 @@ export async function loadAllUsersGlobalAction() {
   const sb = getSupabase()
   const [{ users: authUsers, error: aErr }, { data: profiles, error: pErr }, { data: groups }] = await Promise.all([
     listAllUsers(sb),
-    sb.from('profiles').select('user_id, display_name, role, community_group_id, created_at'),
+    sb.from('profiles').select('user_id, display_name, role, community_group_id, created_at, last_active_at'),
     sb.from('community_groups').select('id, name'),
   ])
   if (aErr || pErr) return { error: (aErr || pErr).message }
@@ -353,6 +353,7 @@ export async function loadAllUsersGlobalAction() {
       group_id: p.community_group_id,
       group_name: groupMap[p.community_group_id] ?? 'Unknown',
       created_at: p.created_at,
+      last_active_at: p.last_active_at ?? null,
       last_sign_in_at: authMap[p.user_id]?.last_sign_in_at ?? null,
     }))
     .sort((a, b) => (a.group_name ?? '').localeCompare(b.group_name ?? ''))

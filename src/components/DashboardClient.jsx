@@ -314,13 +314,13 @@ function exportCSV(groupName, members) {
 }
 
 function exportSearchCSV(users, query) {
-  const headers = ['Name', 'Email', 'Group', 'Role', 'Last Sign In', 'Joined']
+  const headers = ['Name', 'Email', 'Group', 'Role', 'Last Activity', 'Joined']
   const rows = users.map(u => [
     u.display_name ?? '',
     u.email ?? '',
     u.group_name ?? '',
     u.role ?? '',
-    u.last_sign_in_at ? new Date(u.last_sign_in_at).toLocaleString() : '',
+    u.last_active_at ? new Date(u.last_active_at).toLocaleString() : '',
     u.created_at ? new Date(u.created_at).toLocaleString() : '',
   ])
   const csv = [headers, ...rows]
@@ -380,6 +380,7 @@ export default function DashboardClient({ initialGroups }) {
   const [allGlobalUsers, setAllGlobalUsers] = useState(null)
   const [loadingAllGlobal, setLoadingAllGlobal] = useState(false)
   const [searchSort, setSearchSort] = useState({ col: 'group_name', dir: 'asc' })
+  const [searchMenuId, setSearchMenuId] = useState(null)
 
   const [broadcastTarget, setBroadcastTarget] = useState(null) // null | 'all' | 'selected' | groupId string
   const [broadcastGroupName, setBroadcastGroupName] = useState('')
@@ -1249,20 +1250,20 @@ export default function DashboardClient({ initialGroups }) {
                         Export CSV
                       </button>
                     </div>
-                    <table className="w-full text-sm">
+                    <table className="w-full text-sm" onClick={() => setSearchMenuId(null)}>
                       <thead>
                         <tr className="border-b border-stone-100">
                           <SortTh col="display_name" label="Name" />
                           <SortTh col="email" label="Email" />
                           <SortTh col="group_name" label="Group" />
                           <SortTh col="role" label="Role" />
-                          <SortTh col="last_sign_in_at" label="Last Sign In" />
-                          <th className="px-5 py-3 w-32"></th>
+                          <SortTh col="last_active_at" label="Last Activity" />
+                          <th className="px-5 py-3 w-12"></th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-stone-50">
                         {displayedGlobalResults.map(user => (
-                          <tr key={user.id} className="hover:bg-stone-50 transition-colors group">
+                          <tr key={user.id} className="hover:bg-stone-50 transition-colors">
                             <td className="px-5 py-3 font-medium text-stone-800">
                               {editingName?.id === user.id && editingName.type === 'user' ? (
                                 <input
@@ -1299,33 +1300,44 @@ export default function DashboardClient({ initialGroups }) {
                               </button>
                             </td>
                             <td className="px-5 py-3 text-xs text-stone-400 whitespace-nowrap">
-                              {formatTime(user.last_sign_in_at)}
+                              {formatTime(user.last_active_at)}
                               {user.scheduled_delete_at && (
                                 <div className="flex items-center gap-1.5 mt-0.5">
                                   <span className="text-[11px] font-medium text-amber-600">⏳ Deletes {timeUntil(user.scheduled_delete_at)}</span>
-                                  <button onClick={() => handleCancelUserDelete(user)} className="text-[11px] text-stone-400 underline hover:text-stone-600">Cancel</button>
+                                  <button onClick={e => { e.stopPropagation(); handleCancelUserDelete(user) }} className="text-[11px] text-stone-400 underline hover:text-stone-600">Cancel</button>
                                   <span className="text-stone-300 text-[10px]">·</span>
-                                  <button onClick={() => handleOverrideUserDelete(user)} className="text-[11px] text-red-400 underline hover:text-red-600">Delete now</button>
+                                  <button onClick={e => { e.stopPropagation(); handleOverrideUserDelete(user) }} className="text-[11px] text-red-400 underline hover:text-red-600">Delete now</button>
                                 </div>
                               )}
                             </td>
-                            <td className="px-5 py-3">
-                              <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity justify-end">
-                                <button
-                                  onClick={() => { const g = groups.find(g => g.id === user.group_id); if (g) selectGroup(g) }}
-                                  className="px-2 py-0.5 rounded-md text-xs font-medium bg-jade/10 text-jade hover:bg-jade/20 transition-colors whitespace-nowrap"
+                            <td className="px-3 py-3 relative">
+                              <button
+                                onClick={e => { e.stopPropagation(); setSearchMenuId(searchMenuId === user.id ? null : user.id) }}
+                                className="w-7 h-7 flex items-center justify-center rounded-lg text-stone-400 hover:text-stone-700 hover:bg-stone-100 transition-colors text-base leading-none"
+                              >
+                                ⋯
+                              </button>
+                              {searchMenuId === user.id && (
+                                <div
+                                  onClick={e => e.stopPropagation()}
+                                  className="absolute right-3 top-full z-20 mt-1 bg-white rounded-xl border border-stone-200 shadow-lg py-1 min-w-[130px]"
                                 >
-                                  View Group
-                                </button>
-                                {!user.scheduled_delete_at && (
                                   <button
-                                    onClick={() => handleDeleteUser(user)}
-                                    className="px-2 py-0.5 rounded-md text-xs font-medium bg-red-50 text-red-500 hover:bg-red-100 transition-colors"
+                                    onClick={() => { setSearchMenuId(null); const g = groups.find(g => g.id === user.group_id); if (g) selectGroup(g) }}
+                                    className="w-full text-left px-4 py-2 text-sm text-stone-700 hover:bg-stone-50 transition-colors"
                                   >
-                                    Delete
+                                    View Group
                                   </button>
-                                )}
-                              </div>
+                                  {!user.scheduled_delete_at && (
+                                    <button
+                                      onClick={() => { setSearchMenuId(null); handleDeleteUser(user) }}
+                                      className="w-full text-left px-4 py-2 text-sm text-red-500 hover:bg-red-50 transition-colors"
+                                    >
+                                      Delete
+                                    </button>
+                                  )}
+                                </div>
+                              )}
                             </td>
                           </tr>
                         ))}
