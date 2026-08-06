@@ -338,10 +338,13 @@ export async function loadAllUsersGlobalAction() {
   const sb = getSupabase()
   const [{ users: authUsers, error: aErr }, { data: profiles, error: pErr }, { data: groups }] = await Promise.all([
     listAllUsers(sb),
-    sb.from('profiles').select('user_id, display_name, role, community_group_id, created_at, last_active_at'),
+    sb.from('profiles').select('user_id, display_name, role, community_group_id, created_at'),
     sb.from('community_groups').select('id, name'),
   ])
   if (aErr || pErr) return { error: (aErr || pErr).message }
+  const userIds = (profiles ?? []).map(p => p.user_id)
+  const { data: sessionData } = await sb.rpc('admin_get_last_session', { user_ids: userIds })
+  const sessionMap = Object.fromEntries((sessionData ?? []).map(s => [s.user_id, s.last_active_at]))
   const authMap = Object.fromEntries((authUsers ?? []).map(u => [u.id, u]))
   const groupMap = Object.fromEntries((groups ?? []).map(g => [g.id, g.name]))
   const results = (profiles ?? [])
@@ -353,7 +356,7 @@ export async function loadAllUsersGlobalAction() {
       group_id: p.community_group_id,
       group_name: groupMap[p.community_group_id] ?? 'Unknown',
       created_at: p.created_at,
-      last_active_at: p.last_active_at ?? null,
+      last_active_at: sessionMap[p.user_id] ?? null,
       last_sign_in_at: authMap[p.user_id]?.last_sign_in_at ?? null,
     }))
     .sort((a, b) => (a.group_name ?? '').localeCompare(b.group_name ?? ''))
