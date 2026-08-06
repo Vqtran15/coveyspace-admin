@@ -314,13 +314,14 @@ function exportCSV(groupName, members) {
 }
 
 function exportSearchCSV(users, query) {
-  const headers = ['Name', 'Email', 'Group', 'Role', 'Last Activity', 'Joined']
+  const headers = ['Name', 'Email', 'Group', 'Role', 'Last Activity', 'Last App Open', 'Joined']
   const rows = users.map(u => [
     u.display_name ?? '',
     u.email ?? '',
     u.group_name ?? '',
     u.role ?? '',
     u.last_active_at ? new Date(u.last_active_at).toLocaleString() : '',
+    u.last_sign_in_at ? new Date(u.last_sign_in_at).toLocaleString() : '',
     u.created_at ? new Date(u.created_at).toLocaleString() : '',
   ])
   const csv = [headers, ...rows]
@@ -1258,6 +1259,7 @@ export default function DashboardClient({ initialGroups }) {
                           <SortTh col="group_name" label="Group" />
                           <SortTh col="role" label="Role" />
                           <SortTh col="last_active_at" label="Last Activity" />
+                          <SortTh col="last_sign_in_at" label="Last App Open" />
                           <th className="px-5 py-3 w-12"></th>
                         </tr>
                       </thead>
@@ -1309,6 +1311,9 @@ export default function DashboardClient({ initialGroups }) {
                                   <button onClick={e => { e.stopPropagation(); handleOverrideUserDelete(user) }} className="text-[11px] text-red-400 underline hover:text-red-600">Delete now</button>
                                 </div>
                               )}
+                            </td>
+                            <td className="px-5 py-3 text-xs text-stone-400 whitespace-nowrap">
+                              {formatTime(user.last_sign_in_at)}
                             </td>
                             <td className="px-3 py-3 relative">
                               <button
