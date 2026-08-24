@@ -793,3 +793,174 @@ export async function loadGroupActivityAction(groupId) {
     },
   }
 }
+
+// ─── Church actions ───────────────────────────────────────────────────────────
+
+export async function loadChurchesAction() {
+  await requireAuth()
+  const sb = getSupabase()
+  const { data: churches, error } = await sb
+    .from('churches')
+    .select('id, name, created_at')
+    .order('created_at', { ascending: false })
+  if (error) return { error: error.message }
+
+  // For each church, get affiliated groups and assigned admins
+  const churchIds = (churches ?? []).map(c => c.id)
+  if (!churchIds.length) return { data: [] }
+
+  const [{ data: groups }, { data: roles }, { users: authUsers }] = await Promise.all([
+    sb.from('community_groups')
+      .select('id, name, church_id, profiles(count)')
+      .in('church_id', churchIds),
+    sb.from('church_roles')
+      .select('user_id, church_id, role'),
+    listAllUsers(sb),
+  ])
+
+  const authMap = Object.fromEntries((authUsers ?? []).map(u => [u.id, u]))
+
+  // Enrich admins with email/display name
+  const adminUserIds = [...new Set((roles ?? []).map(r => r.user_id))]
+  const { data: adminProfiles } = adminUserIds.length
+    ? await sb.from('profiles').select('user_id, display_name, community_group_id').in('user_id', adminUserIds)
+    : { data: [] }
+  const profileMap = Object.fromEntries((adminProfiles ?? []).map(p => [p.user_id, p]))
+
+  const enrichedAdmins = (roles ?? []).map(r => ({
+    userId: r.user_id,
+    churchId: r.church_id,
+    role: r.role,
+    displayName: profileMap[r.user_id]?.display_name ?? '—',
+    email: authMap[r.user_id]?.email ?? '—',
+  }))
+
+  return {
+    data: (churches ?? []).map(c => ({
+      id: c.id,
+      name: c.name,
+      created_at: c.created_at,
+      groups: (groups ?? [])
+        .filter(g => g.church_id === c.id)
+        .map(g => ({ id: g.id, name: g.name, memberCount: g.profiles?.[0]?.count ?? 0 })),
+      admins: enrichedAdmins.filter(a => a.churchId === c.id),
+    })),
+  }
+}
+
+export async function createChurchAction(name) {
+  await requireAuth()
+  const ip = await getIp()
+  const sb = getSupabase()
+  const trimmed = name?.trim()
+  if (!trimmed) return { error: 'Church name is required' }
+
+  const { data, error } = await sb
+    .from('churches')
+    .insert({ name: trimmed })
+    .select('id, name, created_at')
+    .single()
+  if (error) return { error: error.message }
+
+  await logAudit({ action: 'create_church', targetType: 'church', targetId: data.id, targetLabel: trimmed, ip })
+  return { data }
+}
+
+export async function assignChurchAdminAction(churchId, userEmail) {
+  await requireAuth()
+  const ip = await getIp()
+  const sb = getSupabase()
+
+  // Find user by email via auth admin API
+  const { users, error: listErr } = await listAllUsers(sb)
+  if (listErr) return { error: listErr.message }
+  const user = users.find(u => u.email?.toLowerCase() === userEmail.trim().toLowerCase())
+  if (!user) return { error: `No user found with email "${userEmail}"` }
+
+  const { error } = await sb
+    .from('church_roles')
+    .upsert({ user_id: user.id, church_id: churchId, role: 'admin' }, { onConflict: 'user_id,church_id' })
+  if (error) return { error: error.message }
+
+  // Get display name for audit log
+  const { data: profile } = await sb.from('profiles').select('display_name').eq('user_id', user.id).single()
+  await logAudit({ action: 'assign_church_admin', targetType: 'church', targetId: churchId, targetLabel: profile?.display_name ?? userEmail, ip })
+  return { data: { userId: user.id, email: user.email, displayName: profile?.display_name ?? '—' } }
+}
+
+export async function removeChurchAdminAction(churchId, userId) {
+  await requireAuth()
+  const ip = await getIp()
+  const sb = getSupabase()
+
+  const { error } = await sb
+    .from('church_roles')
+    .delete()
+    .eq('church_id', churchId)
+    .eq('user_id', userId)
+  if (error) return { error: error.message }
+
+  await logAudit({ action: 'remove_church_admin', targetType: 'church', targetId: churchId, targetLabel: userId, ip })
+  return { success: true }
+}
+
+export async function linkGroupToChurchAction(groupId, churchId) {
+  await requireAuth()
+  const ip = await getIp()
+  const sb = getSupabase()
+
+  const { error } = await sb
+    .from('community_groups')
+    .update({ church_id: churchId || null })
+    .eq('id', groupId)
+  if (error) return { error: error.message }
+
+  await logAudit({ action: churchId ? 'link_group_to_church' : 'unlink_group_from_church', targetType: 'group', targetId: groupId, targetLabel: groupId, ip })
+  return { success: true }
+}
+
+export async function searchUsersForChurchAction(query) {
+  await requireAuth()
+  const sb = getSupabase()
+  const { users, error } = await listAllUsers(sb)
+  if (error) return { error: error.message }
+
+  const q = query.trim().toLowerCase()
+  if (!q) return { data: [] }
+
+  const matched = users.filter(u =>
+    u.email?.toLowerCase().includes(q)
+  ).slice(0, 10)
+
+  const matchedIds = matched.map(u => u.id)
+  const { data: profiles } = matchedIds.length
+    ? await sb.from('profiles').select('user_id, display_name').in('user_id', matchedIds)
+    : { data: [] }
+  const profileMap = Object.fromEntries((profiles ?? []).map(p => [p.user_id, p]))
+
+  return {
+    data: matched.map(u => ({
+      id: u.id,
+      email: u.email,
+      displayName: profileMap[u.id]?.display_name ?? '—',
+    })),
+  }
+}
+
+export async function loadUnaffiliatedGroupsAction() {
+  await requireAuth()
+  const sb = getSupabase()
+  const { data, error } = await sb
+    .from('community_groups')
+    .select('id, name, church_id, profiles(count)')
+    .order('name')
+  if (error) return { error: error.message }
+  return {
+    data: (data ?? []).map(g => ({
+      id: g.id,
+      name: g.name,
+      churchId: g.church_id ?? null,
+      memberCount: g.profiles?.[0]?.count ?? 0,
+    })),
+  }
+}

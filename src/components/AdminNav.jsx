@@ -16,6 +16,7 @@ import {
   SignOut,
   MagnifyingGlass,
   Shield,
+  Church,
 } from '@phosphor-icons/react'
 import { logoutAction } from '@/actions/auth'
 
@@ -76,6 +77,7 @@ export default function AdminNav({
     if (view === 'errors') return pathname === '/errors'
     if (view === 'broadcast') return pathname === '/broadcast'
     if (view === 'broadcast-admins') return pathname === '/broadcast-admins'
+    if (view === 'churches') return pathname === '/churches'
     if (view === 'search') return pathname === '/dashboard' && activeView === 'search'
     return pathname === '/dashboard' && activeView === view
   }
@@ -132,6 +134,14 @@ export default function AdminNav({
           label="Groups"
           sublabel="Manage communities"
           active={isActive('groups')}
+          collapsed={collapsed}
+        />
+        <NavItem
+          href="/churches"
+          icon={Church}
+          label="Churches"
+          sublabel="Multi-group parents"
+          active={isActive('churches')}
           collapsed={collapsed}
         />
         <NavItem
