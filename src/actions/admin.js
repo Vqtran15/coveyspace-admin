@@ -43,34 +43,49 @@ export async function loadGroups() {
 export async function loadMembers(groupId) {
   await requireAuth()
   const sb = getSupabase()
-  const [{ data: profiles, error: pErr }, { users: authUsers, error: aErr }, { data: pushSubs }] = await Promise.all([
-    sb.from('profiles').select('*').eq('community_group_id', groupId).order('created_at'),
+
+  // Use group_memberships as the source of truth for who belongs to a group.
+  // profiles.community_group_id only reflects the user's active group, so it
+  // misses users who joined this group but haven't switched to it yet, and
+  // incorrectly hides users who have since switched their active group away.
+  const [{ data: memberships, error: mErr }, { users: authUsers, error: aErr }, { data: pushSubs }] = await Promise.all([
+    sb.from('group_memberships').select('user_id, role, joined_at').eq('community_group_id', groupId).order('joined_at'),
     listAllUsers(sb),
     sb.from('push_subscriptions').select('user_id').eq('community_group_id', groupId),
   ])
-  if (pErr || aErr) return { error: (pErr || aErr).message }
+  if (mErr || aErr) return { error: (mErr || aErr).message }
 
+  const userIds = (memberships ?? []).map(m => m.user_id)
+  if (!userIds.length) return { data: [] }
+
+  const { data: profiles } = await sb.from('profiles').select('*').in('user_id', userIds)
+
+  const profileMap = Object.fromEntries((profiles ?? []).map(p => [p.user_id, p]))
+  const membershipMap = Object.fromEntries((memberships ?? []).map(m => [m.user_id, m]))
   const authMap = Object.fromEntries((authUsers ?? []).map(u => [u.id, u]))
-  const userIds = (profiles ?? []).map(p => p.user_id)
   const pushSubSet = new Set((pushSubs ?? []).map(s => s.user_id))
 
   const { data: sessionData } = await sb.rpc('admin_get_last_session', { user_ids: userIds })
   const sessionMap = Object.fromEntries((sessionData ?? []).map(s => [s.user_id, s.last_active_at]))
 
   return {
-    data: (profiles ?? []).map(p => ({
-      id: p.user_id,
-      display_name: p.display_name,
-      role: p.role,
-      created_at: p.created_at,
-      community_group_id: p.community_group_id,
-      email: authMap[p.user_id]?.email ?? '',
-      last_sign_in_at: authMap[p.user_id]?.last_sign_in_at ?? null,
-      last_active_at: sessionMap[p.user_id] ?? null,
-      push_subscribed: pushSubSet.has(p.user_id),
-      is_pwa: p.is_pwa ?? false,
-      scheduled_delete_at: p.scheduled_delete_at ?? null,
-    })),
+    data: userIds.map(userId => {
+      const p = profileMap[userId] ?? {}
+      const m = membershipMap[userId] ?? {}
+      return {
+        id: userId,
+        display_name: p.display_name,
+        role: m.role,  // role for THIS group, not the user's current active group
+        created_at: m.joined_at,
+        community_group_id: groupId,
+        email: authMap[userId]?.email ?? '',
+        last_sign_in_at: authMap[userId]?.last_sign_in_at ?? null,
+        last_active_at: sessionMap[userId] ?? null,
+        push_subscribed: pushSubSet.has(userId),
+        is_pwa: p.is_pwa ?? false,
+        scheduled_delete_at: p.scheduled_delete_at ?? null,
+      }
+    }),
   }
 }
 
