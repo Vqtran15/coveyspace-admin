@@ -27,14 +27,14 @@ export async function loadGroups() {
   await requireAuth()
   const { data, error } = await getSupabase()
     .from('community_groups')
-    .select('id, name, created_at, scheduled_delete_at, profiles(count)')
+    .select('id, name, created_at, scheduled_delete_at, group_memberships(count)')
     .order('created_at', { ascending: false })
   if (error) return { error: error.message }
   const mapped = (data ?? []).map(g => ({
     id: g.id,
     name: g.name,
     created_at: g.created_at,
-    member_count: g.profiles?.[0]?.count ?? 0,
+    member_count: g.group_memberships?.[0]?.count ?? 0,
     scheduledDeleteAt: g.scheduled_delete_at ?? null,
   }))
   return { data: mapped }
@@ -385,8 +385,8 @@ export async function deleteAllEmptyGroupsAction() {
   try {
     const { data: groups } = await sb
       .from('community_groups')
-      .select('id, name, profiles(count)')
-    const empty = (groups ?? []).filter(g => (g.profiles?.[0]?.count ?? 0) === 0)
+      .select('id, name, group_memberships(count)')
+    const empty = (groups ?? []).filter(g => (g.group_memberships?.[0]?.count ?? 0) === 0)
     if (!empty.length) return { success: true, count: 0 }
     await Promise.all(empty.map(g => sb.from('community_groups').delete().eq('id', g.id)))
     await logAudit({
@@ -475,7 +475,7 @@ export async function loadMetricsAction({ periodStart, periodEnd } = {}) {
     sb.from('community_groups').select('*', { count: 'exact', head: true }).gte('created_at', start).lte('created_at', end),
     sb.from('profiles').select('*', { count: 'exact', head: true }).gte('created_at', start).lte('created_at', end),
     sb.from('messages').select('*', { count: 'exact', head: true }).gte('created_at', start).lte('created_at', end),
-    sb.from('community_groups').select('id, name, created_at, scheduled_delete_at, profiles(count)').order('created_at', { ascending: false }),
+    sb.from('community_groups').select('id, name, created_at, scheduled_delete_at, group_memberships(count)').order('created_at', { ascending: false }),
     sb.from('conversations').select('community_group_id, updated_at, messages(count)'),
     sb.from('profiles').select('user_id, community_group_id, last_seen_at'),
     sb.from('prayer_requests').select('member_user_id, created_at'),
@@ -491,7 +491,7 @@ export async function loadMetricsAction({ periodStart, periodEnd } = {}) {
   for (const g of groupsWithMembers ?? []) {
     statsMap[g.id] = {
       name: g.name,
-      members: g.profiles?.[0]?.count ?? 0,
+      members: g.group_memberships?.[0]?.count ?? 0,
       messages: 0,
       lastActivity: null,
       lastSeen: null,
@@ -826,7 +826,7 @@ export async function loadChurchesAction() {
 
   const [{ data: groups }, { data: roles }, { users: authUsers }] = await Promise.all([
     sb.from('community_groups')
-      .select('id, name, church_id, profiles(count)')
+      .select('id, name, church_id, group_memberships(count)')
       .in('church_id', churchIds),
     sb.from('church_roles')
       .select('user_id, church_id, role'),
@@ -857,7 +857,7 @@ export async function loadChurchesAction() {
       created_at: c.created_at,
       groups: (groups ?? [])
         .filter(g => g.church_id === c.id)
-        .map(g => ({ id: g.id, name: g.name, memberCount: g.profiles?.[0]?.count ?? 0 })),
+        .map(g => ({ id: g.id, name: g.name, memberCount: g.group_memberships?.[0]?.count ?? 0 })),
       admins: enrichedAdmins.filter(a => a.churchId === c.id),
     })),
   }
@@ -967,7 +967,7 @@ export async function loadUnaffiliatedGroupsAction() {
   const sb = getSupabase()
   const { data, error } = await sb
     .from('community_groups')
-    .select('id, name, church_id, profiles(count)')
+    .select('id, name, church_id, group_memberships(count)')
     .order('name')
   if (error) return { error: error.message }
   return {
@@ -975,7 +975,7 @@ export async function loadUnaffiliatedGroupsAction() {
       id: g.id,
       name: g.name,
       churchId: g.church_id ?? null,
-      memberCount: g.profiles?.[0]?.count ?? 0,
+      memberCount: g.group_memberships?.[0]?.count ?? 0,
     })),
   }
 }
