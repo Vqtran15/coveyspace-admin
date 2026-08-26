@@ -318,7 +318,7 @@ function exportSearchCSV(users, query) {
   const rows = users.map(u => [
     u.display_name ?? '',
     u.email ?? '',
-    (u.all_groups ?? []).map(g => g.group_name + (g.church_name ? ` (${g.church_name})` : '')).join('; ') || u.group_name ?? '',
+    (u.all_groups ?? []).map(g => g.group_name + (g.church_name ? ` (${g.church_name})` : '')).join('; ') || (u.group_name ?? ''),
     u.role ?? '',
     u.last_active_at ? new Date(u.last_active_at).toLocaleString() : '',
     u.last_sign_in_at ? new Date(u.last_sign_in_at).toLocaleString() : '',
