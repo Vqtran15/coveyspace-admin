@@ -351,29 +351,44 @@ export async function searchUsersGlobalAction(query) {
 export async function loadAllUsersGlobalAction() {
   await requireAuth()
   const sb = getSupabase()
-  const [{ users: authUsers, error: aErr }, { data: profiles, error: pErr }, { data: groups }] = await Promise.all([
+  const [{ users: authUsers, error: aErr }, { data: profiles, error: pErr }, { data: groups }, { data: memberships }] = await Promise.all([
     listAllUsers(sb),
     sb.from('profiles').select('user_id, display_name, role, community_group_id, created_at'),
-    sb.from('community_groups').select('id, name'),
+    sb.from('community_groups').select('id, name, church_id, churches(name)'),
+    sb.from('group_memberships').select('user_id, community_group_id'),
   ])
   if (aErr || pErr) return { error: (aErr || pErr).message }
   const userIds = (profiles ?? []).map(p => p.user_id)
   const { data: sessionData } = await sb.rpc('admin_get_last_session', { user_ids: userIds })
   const sessionMap = Object.fromEntries((sessionData ?? []).map(s => [s.user_id, s.last_active_at]))
   const authMap = Object.fromEntries((authUsers ?? []).map(u => [u.id, u]))
-  const groupMap = Object.fromEntries((groups ?? []).map(g => [g.id, g.name]))
+  const groupMap = Object.fromEntries((groups ?? []).map(g => [g.id, { name: g.name, church_name: g.churches?.name ?? null }]))
+
+  // Build per-user all-groups list from group_memberships (source of truth)
+  const userGroupsMap = {}
+  for (const m of memberships ?? []) {
+    if (!userGroupsMap[m.user_id]) userGroupsMap[m.user_id] = []
+    const info = groupMap[m.community_group_id]
+    if (info) userGroupsMap[m.user_id].push({ group_id: m.community_group_id, group_name: info.name, church_name: info.church_name })
+  }
+
   const results = (profiles ?? [])
-    .map(p => ({
-      id: p.user_id,
-      display_name: p.display_name,
-      role: p.role,
-      email: authMap[p.user_id]?.email ?? '',
-      group_id: p.community_group_id,
-      group_name: groupMap[p.community_group_id] ?? 'Unknown',
-      created_at: p.created_at,
-      last_active_at: sessionMap[p.user_id] ?? null,
-      last_sign_in_at: authMap[p.user_id]?.last_sign_in_at ?? null,
-    }))
+    .map(p => {
+      const activeInfo = groupMap[p.community_group_id]
+      const allGroups = userGroupsMap[p.user_id] ?? (activeInfo ? [{ group_id: p.community_group_id, group_name: activeInfo.name, church_name: activeInfo.church_name }] : [])
+      return {
+        id: p.user_id,
+        display_name: p.display_name,
+        role: p.role,
+        email: authMap[p.user_id]?.email ?? '',
+        group_id: p.community_group_id,
+        group_name: activeInfo?.name ?? 'Unknown',
+        all_groups: allGroups,
+        created_at: p.created_at,
+        last_active_at: sessionMap[p.user_id] ?? null,
+        last_sign_in_at: authMap[p.user_id]?.last_sign_in_at ?? null,
+      }
+    })
     .sort((a, b) => (a.group_name ?? '').localeCompare(b.group_name ?? ''))
   return { data: results }
 }

@@ -318,7 +318,7 @@ function exportSearchCSV(users, query) {
   const rows = users.map(u => [
     u.display_name ?? '',
     u.email ?? '',
-    u.group_name ?? '',
+    (u.all_groups ?? []).map(g => g.group_name + (g.church_name ? ` (${g.church_name})` : '')).join('; ') || u.group_name ?? '',
     u.role ?? '',
     u.last_active_at ? new Date(u.last_active_at).toLocaleString() : '',
     u.last_sign_in_at ? new Date(u.last_sign_in_at).toLocaleString() : '',
@@ -735,7 +735,8 @@ export default function DashboardClient({ initialGroups }) {
       list = list.filter(u =>
         u.display_name?.toLowerCase().includes(q) ||
         u.email?.toLowerCase().includes(q) ||
-        u.group_name?.toLowerCase().includes(q)
+        u.group_name?.toLowerCase().includes(q) ||
+        u.all_groups?.some(g => g.group_name?.toLowerCase().includes(q) || g.church_name?.toLowerCase().includes(q))
       )
     }
     const { col, dir } = searchSort
@@ -1289,12 +1290,21 @@ export default function DashboardClient({ initialGroups }) {
                             </td>
                             <td className="px-5 py-3 text-stone-500">{user.email || '—'}</td>
                             <td className="px-5 py-3 text-stone-600">
-                              <button
-                                onClick={() => { const g = groups.find(g => g.id === user.group_id); if (g) selectGroup(g) }}
-                                className="hover:text-jade transition-colors"
-                              >
-                                {user.group_name}
-                              </button>
+                              <div className="flex flex-col gap-1">
+                                {(user.all_groups?.length ? user.all_groups : [{ group_id: user.group_id, group_name: user.group_name, church_name: null }]).map(g => (
+                                  <div key={g.group_id}>
+                                    <button
+                                      onClick={() => { const grp = groups.find(gr => gr.id === g.group_id); if (grp) selectGroup(grp) }}
+                                      className="hover:text-jade transition-colors text-left leading-snug"
+                                    >
+                                      {g.group_name}
+                                    </button>
+                                    {g.church_name && (
+                                      <p className="text-xs text-stone-400 leading-tight">{g.church_name}</p>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
                             </td>
                             <td className="px-5 py-3">
                               <button onClick={() => handleToggleRole(user)} title="Click to toggle role">
