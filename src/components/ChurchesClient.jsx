@@ -10,6 +10,7 @@ import {
   linkGroupToChurchAction,
   searchUsersForChurchAction,
   loadUnaffiliatedGroupsAction,
+  deleteChurchAction,
 } from '@/actions/admin'
 import { formatDate } from '@/lib/format'
 
@@ -38,6 +39,10 @@ export default function ChurchesClient({ initialChurches }) {
   const [adminSearch, setAdminSearch] = useState([])
   const [adminSearching, setAdminSearching] = useState(false)
   const [assigning, setAssigning] = useState(false)
+
+  // Delete church
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   // Link group
   const [showLinkGroup, setShowLinkGroup] = useState(false)
@@ -135,6 +140,18 @@ export default function ChurchesClient({ initialChurches }) {
     })
   }
 
+  async function handleDeleteChurch() {
+    if (!selectedChurch) return
+    setDeleting(true)
+    const r = await deleteChurchAction(selectedChurch.id, selectedChurch.name)
+    setDeleting(false)
+    if (r.error) { showToast(r.error, 'error'); setConfirmDelete(false); return }
+    setChurches(prev => prev.filter(c => c.id !== selectedChurch.id))
+    setSelectedChurch(null)
+    setConfirmDelete(false)
+    showToast(`Church "${selectedChurch.name}" deleted`)
+  }
+
   return (
     <div className="h-full flex overflow-hidden">
       {/* Toast */}
@@ -205,7 +222,7 @@ export default function ChurchesClient({ initialChurches }) {
           {churches.map(church => (
             <div
               key={church.id}
-              onClick={() => setSelectedChurch(church)}
+              onClick={() => { setSelectedChurch(church); setConfirmDelete(false) }}
               className={`px-4 py-3 cursor-pointer border-b border-stone-50 transition-colors ${
                 selectedChurch?.id === church.id
                   ? 'bg-sunrise-50 border-l-2 border-l-jade'
@@ -239,6 +256,35 @@ export default function ChurchesClient({ initialChurches }) {
               <div>
                 <h2 className="text-xl font-bold text-stone-800">{selectedChurch.name}</h2>
                 <p className="text-xs text-stone-400 mt-0.5">Created {formatDate(selectedChurch.created_at)}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                {confirmDelete ? (
+                  <>
+                    <span className="text-xs text-stone-500">Delete this church?</span>
+                    <button
+                      onClick={handleDeleteChurch}
+                      disabled={deleting}
+                      className="px-3 py-1.5 rounded-lg bg-red-500 text-white text-xs font-semibold hover:bg-red-600 disabled:opacity-40 transition-colors"
+                    >
+                      {deleting ? 'Deleting…' : 'Confirm'}
+                    </button>
+                    <button
+                      onClick={() => setConfirmDelete(false)}
+                      disabled={deleting}
+                      className="px-3 py-1.5 rounded-lg text-xs text-stone-500 hover:text-stone-700 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={() => setConfirmDelete(true)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-50 text-red-500 text-xs font-semibold hover:bg-red-100 transition-colors"
+                  >
+                    <Trash size={14} />
+                    Delete
+                  </button>
+                )}
               </div>
             </div>
 

@@ -949,6 +949,21 @@ export async function linkGroupToChurchAction(groupId, churchId) {
   return { success: true }
 }
 
+export async function deleteChurchAction(churchId, churchName) {
+  await requireAuth()
+  const ip = await getIp()
+  const sb = getSupabase()
+
+  // Unlink all affiliated groups first (SET NULL via FK cascade doesn't auto-fire here)
+  await sb.from('community_groups').update({ church_id: null }).eq('church_id', churchId)
+
+  const { error } = await sb.from('churches').delete().eq('id', churchId)
+  if (error) return { error: error.message }
+
+  await logAudit({ action: 'delete_church', targetType: 'church', targetId: churchId, targetLabel: churchName, ip })
+  return { success: true }
+}
+
 export async function searchUsersForChurchAction(query) {
   await requireAuth()
   const sb = getSupabase()
